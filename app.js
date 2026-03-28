@@ -138,131 +138,112 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 // ============================================================
 //  PAYOUT CALCULATOR
+//  Rules:
+//   - 3rd place always gets their wager back (fixed)
+//   - Remaining pot = total - wager
+//   - 1st and 2nd split the remaining by admin-set percentage
+//   - Payouts update live as participants join
 // ============================================================
 
-// 3rd place always = wager (breaks even)
-// Remaining pot after 3rd = distributed between 1st and 2nd (~62.5% / 37.5%)
-function calcPayout(wager, participants) {
-  const total  = Math.round(wager * participants * 100) / 100;
-  const third  = wager; // always breaks even
-  const remaining = Math.round((total - third) * 100) / 100;
-  const first  = Math.round(remaining * 0.625 * 100) / 100;
-  const second = Math.round((remaining - first) * 100) / 100;
-  return { total, first, second, third };
+// Default 1st/2nd split: 65% / 35% of remaining pot
+let firstSplitPct = 65;
+
+function calcPayout(wager, participants, firstPct = firstSplitPct) {
+  const secondPct  = 100 - firstPct;
+  const total      = Math.round(wager * participants * 100) / 100;
+  const third      = wager; // always breaks even
+  const remaining  = Math.round((total - third) * 100) / 100;
+  const first      = Math.round(remaining * (firstPct / 100) * 100) / 100;
+  const second     = Math.round((remaining - first) * 100) / 100;
+  return { total, remaining, first, second, third, firstPct, secondPct };
 }
 
-// Track whether user has manually overridden payouts
-let payoutOverride = { first: null, second: null, third: null };
-
 function updatePayoutPreview() {
-  const wager = parseFloat(document.getElementById('challengeWager').value) || 0;
+  const wager   = parseFloat(document.getElementById('challengeWager').value) || 0;
   const preview = document.getElementById('payoutPreview');
 
   if (!wager || wager <= 0) {
     preview.innerHTML = '<span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>';
-    payoutOverride = { first: null, second: null, third: null };
     return;
   }
 
-  const assumed = 4;
-  const p = calcPayout(wager, assumed);
+  // Show live preview for a range of participant counts
+  const counts  = [2, 3, 4, 5, 6];
+  const current = firstSplitPct;
+  const second  = 100 - current;
 
-  // Use override values if set, otherwise use calculated defaults
-  const firstVal  = payoutOverride.first  ?? p.first;
-  const secondVal = payoutOverride.second ?? p.second;
-  const thirdVal  = payoutOverride.third  ?? p.third;
-  const potVal    = Math.round((firstVal + secondVal + thirdVal) * 100) / 100;
-  const warning   = potVal !== p.total
-    ? `<div style="color:var(--warn);font-size:11px;margin-top:8px;">
-        ⚠️ Custom total $${potVal} differs from pot of $${p.total}
-       </div>`
-    : '';
+  // Build rows for each participant count
+  const rows = counts.map(n => {
+    const p = calcPayout(wager, n, current);
+    return `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:7px 8px;color:var(--text2);font-size:13px;">${n} people</td>
+        <td style="padding:7px 8px;font-weight:600;color:var(--accent);font-family:'Syne',sans-serif;">$${p.total}</td>
+        <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.first}</td>
+        <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.second}</td>
+        <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.third}</td>
+      </tr>`;
+  }).join('');
 
   preview.innerHTML = `
-    <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">
-      Preview based on ${assumed} participants · Total pot:
-      <strong style="color:var(--text)">$${p.total}</strong>
-    </div>
-
-    <div class="payout-row" style="margin-bottom:10px;align-items:center;">
-      <span class="payout-place">🥇 1st Place</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <input type="number" class="input payout-input" id="payoutFirst"
-          value="${firstVal}" min="0" step="0.01"
-          style="width:90px;padding:6px 10px;text-align:right;"
-          placeholder="${p.first}"/>
-        <span style="color:var(--text3);font-size:12px;">$</span>
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;">
+          1st / 2nd Split of Remaining Pot
+        </span>
+        <button type="button" id="resetSplitBtn"
+          style="font-size:11px;color:var(--accent2);background:none;border:none;cursor:pointer;padding:0;">
+          Reset to 65/35
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:13px;color:var(--text2);">🥇 1st</span>
+        <input type="range" id="splitSlider" min="50" max="90" step="5"
+          value="${current}"
+          style="flex:1;accent-color:var(--accent);cursor:pointer;"/>
+        <span style="font-size:13px;color:var(--text2);">🥈 2nd</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;">
+        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent);">${current}%</span>
+        <span style="font-size:11px;color:var(--text3);align-self:center;">of remaining after 3rd</span>
+        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent2);">${second}%</span>
       </div>
     </div>
 
-    <div class="payout-row" style="margin-bottom:10px;align-items:center;">
-      <span class="payout-place">🥈 2nd Place</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <input type="number" class="input payout-input" id="payoutSecond"
-          value="${secondVal}" min="0" step="0.01"
-          style="width:90px;padding:6px 10px;text-align:right;"
-          placeholder="${p.second}"/>
-        <span style="color:var(--text3);font-size:12px;">$</span>
-      </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">
+      🥉 3rd place always gets <strong style="color:var(--text);">$${wager}</strong> back (their wager) · Payouts update live as people join
     </div>
 
-    <div class="payout-row" style="align-items:center;">
-      <span class="payout-place">🥉 3rd Place</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <input type="number" class="input payout-input" id="payoutThird"
-          value="${thirdVal}" min="0" step="0.01"
-          style="width:90px;padding:6px 10px;text-align:right;"
-          placeholder="${p.third}"/>
-        <span style="color:var(--text3);font-size:12px;">$</span>
-      </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Participants</th>
+            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Pot</th>
+            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥇 1st</th>
+            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥈 2nd</th>
+            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥉 3rd</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
     </div>
-
-    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:11px;color:var(--text3);">3rd place defaults to wager amount (breaks even)</span>
-      <button type="button" id="resetPayoutBtn"
-        style="font-size:11px;color:var(--accent2);background:none;border:none;cursor:pointer;padding:0;">
-        Reset to defaults
-      </button>
-    </div>
-    ${warning}
   `;
 
-  // Listen for manual changes to payout inputs
-  ['payoutFirst','payoutSecond','payoutThird'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('input', () => {
-        payoutOverride.first  = parseFloat(document.getElementById('payoutFirst')?.value)  || 0;
-        payoutOverride.second = parseFloat(document.getElementById('payoutSecond')?.value) || 0;
-        payoutOverride.third  = parseFloat(document.getElementById('payoutThird')?.value)  || 0;
-        // Re-render warning only
-        const newPot = Math.round((payoutOverride.first + payoutOverride.second + payoutOverride.third) * 100) / 100;
-        const warnEl = preview.querySelector('#payoutWarning');
-        const warningHtml = newPot !== p.total
-          ? `<div id="payoutWarning" style="color:var(--warn);font-size:11px;margin-top:8px;">
-              ⚠️ Custom total $${newPot} differs from pot of $${p.total}
-             </div>`
-          : '';
-        // Remove old warning and append new
-        const existing = preview.querySelector('#payoutWarning');
-        if (existing) existing.remove();
-        if (warningHtml) preview.insertAdjacentHTML('beforeend', warningHtml);
-      });
-    }
+  // Slider interaction — update split % live
+  document.getElementById('splitSlider')?.addEventListener('input', (e) => {
+    firstSplitPct = parseInt(e.target.value);
+    updatePayoutPreview();
   });
 
-  // Reset button
-  document.getElementById('resetPayoutBtn')?.addEventListener('click', () => {
-    payoutOverride = { first: null, second: null, third: null };
+  // Reset split button
+  document.getElementById('resetSplitBtn')?.addEventListener('click', () => {
+    firstSplitPct = 65;
     updatePayoutPreview();
   });
 }
 
-document.getElementById('challengeWager').addEventListener('input', () => {
-  // Reset overrides when wager changes so defaults recalculate
-  payoutOverride = { first: null, second: null, third: null };
-  updatePayoutPreview();
-});
+document.getElementById('challengeWager').addEventListener('input', updatePayoutPreview);
 
 // ============================================================
 //  MODE SELECTOR
@@ -294,7 +275,7 @@ function closeCreateModal() {
   createModal.classList.remove('active');
   document.getElementById('createChallengeForm').reset();
   document.getElementById('payoutPreview').innerHTML = '<span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>';
-  payoutOverride = { first: null, second: null, third: null };
+  firstSplitPct = 65;
   // Reset mode selector
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
   document.querySelector('.mode-card[data-mode="dynamic"]').classList.add('active');
@@ -342,12 +323,7 @@ document.getElementById('createChallengeForm').addEventListener('submit', async 
   try {
     const inviteCode = generateCode();
 
-    // Read payout values — custom or calculated defaults
-    const defaultP     = calcPayout(wager, 4);
-    const payoutFirst  = parseFloat(document.getElementById('payoutFirst')?.value)  || defaultP.first;
-    const payoutSecond = parseFloat(document.getElementById('payoutSecond')?.value) || defaultP.second;
-    const payoutThird  = parseFloat(document.getElementById('payoutThird')?.value)  || wager;
-
+    // Save payout structure as percentages so it scales with any participant count
     const challengeData = {
       name,
       startDate,
@@ -355,7 +331,7 @@ document.getElementById('createChallengeForm').addEventListener('submit', async 
       wager,
       mode,
       inviteCode,
-      payout: { first: payoutFirst, second: payoutSecond, third: payoutThird },
+      payout: { firstSplitPct: firstSplitPct },
       adminId:   currentUser.uid,
       adminName: currentUser.displayName || currentUser.email,
       participants: [{
@@ -540,17 +516,11 @@ detailModal.addEventListener('click', (e) => {
 });
 
 function showChallengeDetail(id, c) {
-  const isAdmin  = c.adminId === currentUser?.uid;
-  const count    = (c.participants || []).length;
-  // Use saved custom payout if available, otherwise calculate defaults
-  const defaultP = calcPayout(c.wager, count);
-  const p = {
-    total:  Math.round(c.wager * count * 100) / 100,
-    first:  c.payout?.first  ?? defaultP.first,
-    second: c.payout?.second ?? defaultP.second,
-    third:  c.payout?.third  ?? c.wager,
-  };
-  const daysLeft = Math.max(0, Math.ceil((new Date(c.endDate) - new Date()) / 86400000));
+  const isAdmin     = c.adminId === currentUser?.uid;
+  const count       = (c.participants || []).length;
+  const splitPct    = c.payout?.firstSplitPct ?? 65;
+  const p           = calcPayout(c.wager, count, splitPct);
+  const daysLeft    = Math.max(0, Math.ceil((new Date(c.endDate) - new Date()) / 86400000));
 
   document.getElementById('detailChallengeName').textContent = c.name;
 
@@ -595,11 +565,32 @@ function showChallengeDetail(id, c) {
     </div>` : ''}
 
     <div style="margin-bottom:12px;">
-      <div class="section-title" style="margin-top:0;">Payout Breakdown (${count} participants)</div>
+      <div class="section-title" style="margin-top:0;">Live Payout Breakdown · ${count} participant${count !== 1 ? 's' : ''} · $${p.total} pot</div>
       <div class="payout-preview">
-        <div class="payout-row"><span class="payout-place">🥇 1st Place</span><span class="payout-amount">$${p.first}</span></div>
-        <div class="payout-row"><span class="payout-place">🥈 2nd Place</span><span class="payout-amount">$${p.second}</span></div>
-        <div class="payout-row"><span class="payout-place">🥉 3rd Place</span><span class="payout-amount">$${p.third}</span></div>
+        <div class="payout-row" style="margin-bottom:8px;">
+          <span class="payout-place">🥇 1st Place</span>
+          <div style="text-align:right;">
+            <span class="payout-amount">$${p.first}</span>
+            <div style="font-size:11px;color:var(--text3);">${p.firstPct}% of remaining pot</div>
+          </div>
+        </div>
+        <div class="payout-row" style="margin-bottom:8px;">
+          <span class="payout-place">🥈 2nd Place</span>
+          <div style="text-align:right;">
+            <span class="payout-amount">$${p.second}</span>
+            <div style="font-size:11px;color:var(--text3);">${p.secondPct}% of remaining pot</div>
+          </div>
+        </div>
+        <div class="payout-row">
+          <span class="payout-place">🥉 3rd Place</span>
+          <div style="text-align:right;">
+            <span class="payout-amount">$${p.third}</span>
+            <div style="font-size:11px;color:var(--text3);">Wager returned (breaks even)</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);">
+          💡 Payout amounts update automatically as more participants join
+        </div>
       </div>
     </div>
 
