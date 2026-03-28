@@ -1,6 +1,250 @@
 <!DOCTYPE html>
-<html>
-  <body>
-    <h1>Health Challenge App</h1>
-  </body>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FitWager — Health Challenge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <!-- THEME TOGGLE -->
+  <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+    <span class="theme-icon">☀️</span>
+  </button>
+
+  <!-- ===================== LOGIN SCREEN ===================== -->
+  <div id="loginScreen" class="screen active">
+    <div class="login-bg">
+      <div class="orb orb1"></div>
+      <div class="orb orb2"></div>
+      <div class="orb orb3"></div>
+    </div>
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="logo-icon">⚡</span>
+        <h1 class="logo-text">FitWager</h1>
+      </div>
+      <p class="login-tagline">Compete. Improve. Win.</p>
+      <p class="login-sub">Monthly fitness challenges with your crew — backed by real stakes.</p>
+      <button class="btn-google" id="googleSignInBtn">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <p class="login-footer">Your fitness journey, your rules.</p>
+    </div>
+  </div>
+
+  <!-- ===================== MAIN APP ===================== -->
+  <div id="appScreen" class="screen">
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+      <div class="nav-logo">
+        <span>⚡</span> FitWager
+      </div>
+      <div class="nav-links" id="navLinks">
+        <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
+        <a href="#" class="nav-link" data-page="challenges">Challenges</a>
+        <a href="#" class="nav-link" data-page="log">Log Activity</a>
+        <a href="#" class="nav-link" data-page="analytics">Analytics</a>
+      </div>
+      <div class="nav-user">
+        <img id="userAvatar" class="user-avatar" src="" alt="avatar"/>
+        <span id="userName" class="user-name"></span>
+        <button class="btn-signout" id="signOutBtn">Sign Out</button>
+      </div>
+    </nav>
+
+    <!-- ===================== DASHBOARD PAGE ===================== -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Welcome back, <span id="greetName"></span> 👋</h2>
+          <p class="page-sub">Here's your challenge overview</p>
+        </div>
+      </div>
+
+      <div class="stats-grid" id="dashboardStats">
+        <div class="stat-card">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-value" id="statActiveChallenges">—</div>
+          <div class="stat-label">Active Challenges</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-value" id="statTotalPoints">—</div>
+          <div class="stat-label">Total Points</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔥</div>
+          <div class="stat-value" id="statCurrentRank">—</div>
+          <div class="stat-label">Current Rank</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📅</div>
+          <div class="stat-value" id="statDaysLeft">—</div>
+          <div class="stat-label">Days Left</div>
+        </div>
+      </div>
+
+      <div class="section-title">Your Active Challenges</div>
+      <div id="activeChallengesList" class="challenges-list">
+        <div class="empty-state">
+          <span>🏁</span>
+          <p>No active challenges yet.<br/>Create one or join via invite!</p>
+          <button class="btn-primary" onclick="showPage('challenges')">Browse Challenges</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== CHALLENGES PAGE ===================== -->
+    <div id="page-challenges" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Challenges</h2>
+          <p class="page-sub">Create a new challenge or join one</p>
+        </div>
+        <button class="btn-primary" id="openCreateChallenge">+ New Challenge</button>
+      </div>
+
+      <div class="tab-bar">
+        <button class="tab active" data-tab="my-challenges">My Challenges</button>
+        <button class="tab" data-tab="join-challenge">Join via Code</button>
+      </div>
+
+      <div id="tab-my-challenges" class="tab-content active">
+        <div id="myChallengesList" class="challenges-grid">
+          <div class="empty-state">
+            <span>💪</span>
+            <p>No challenges yet. Create your first one!</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-join-challenge" class="tab-content">
+        <div class="join-card">
+          <h3>Join a Challenge</h3>
+          <p>Enter the invite code shared by the challenge creator</p>
+          <div class="input-group">
+            <input type="text" id="inviteCodeInput" class="input" placeholder="Enter invite code (e.g. ABC123)" maxlength="6"/>
+            <button class="btn-primary" id="joinChallengeBtn">Join</button>
+          </div>
+          <div id="joinMessage" class="join-message"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== LOG ACTIVITY PAGE ===================== -->
+    <div id="page-log" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Log Activity</h2>
+          <p class="page-sub">Track today's workout and steps</p>
+        </div>
+      </div>
+      <div class="coming-soon-card">
+        <span>📝</span>
+        <h3>Activity Logging — Coming in Phase 2</h3>
+        <p>Daily workout and step logging will be available once you've joined a challenge.</p>
+      </div>
+    </div>
+
+    <!-- ===================== ANALYTICS PAGE ===================== -->
+    <div id="page-analytics" class="page">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title">Analytics</h2>
+          <p class="page-sub">Your performance data</p>
+        </div>
+      </div>
+      <div class="coming-soon-card">
+        <span>📊</span>
+        <h3>Analytics Dashboard — Coming in Phase 3</h3>
+        <p>Leaderboards, progress charts, and group trends will appear here.</p>
+      </div>
+    </div>
+
+  </div><!-- end appScreen -->
+
+  <!-- ===================== CREATE CHALLENGE MODAL ===================== -->
+  <div id="createChallengeModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Create a New Challenge</h3>
+        <button class="modal-close" id="closeCreateChallenge">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="createChallengeForm">
+
+          <div class="form-group">
+            <label>Challenge Name</label>
+            <input type="text" id="challengeName" class="input" placeholder="e.g. April 2026 Challenge" required/>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Start Date</label>
+              <input type="date" id="challengeStart" class="input" required/>
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="date" id="challengeEnd" class="input" required/>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Wager Amount per Person ($)</label>
+            <input type="number" id="challengeWager" class="input" placeholder="10" min="1" required/>
+          </div>
+
+          <div class="form-group">
+            <label>Point System</label>
+            <div class="mode-selector">
+              <div class="mode-card active" data-mode="dynamic">
+                <div class="mode-title">⚡ Dynamic</div>
+                <div class="mode-desc">Personalized goals based on each user's baseline. Recommended.</div>
+              </div>
+              <div class="mode-card" data-mode="classic">
+                <div class="mode-title">📋 Classic</div>
+                <div class="mode-desc">Fixed goals for everyone. 8k steps, 5 workouts/week.</div>
+              </div>
+            </div>
+            <input type="hidden" id="challengeMode" value="dynamic"/>
+          </div>
+
+          <div class="form-group">
+            <label>Payout Structure</label>
+            <div class="payout-preview" id="payoutPreview">
+              Enter wager amount to see payout breakdown
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" id="cancelCreateChallenge">Cancel</button>
+            <button type="submit" class="btn-primary">Create Challenge ⚡</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CHALLENGE DETAIL MODAL ===================== -->
+  <div id="challengeDetailModal" class="modal-overlay">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 id="detailChallengeName">Challenge Details</h3>
+        <button class="modal-close" id="closeDetailModal">✕</button>
+      </div>
+      <div class="modal-body" id="challengeDetailBody">
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module" src="app.js"></script>
+</body>
 </html>
