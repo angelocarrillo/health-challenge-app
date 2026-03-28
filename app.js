@@ -139,45 +139,130 @@ document.querySelectorAll('.tab').forEach(tab => {
 // ============================================================
 //  PAYOUT CALCULATOR
 // ============================================================
+
+// 3rd place always = wager (breaks even)
+// Remaining pot after 3rd = distributed between 1st and 2nd (~62.5% / 37.5%)
 function calcPayout(wager, participants) {
-  const total = wager * participants;
-  // 1st: ~50%, 2nd: ~30%, 3rd: ~20% (gets money back)
-  const first  = Math.round(total * 0.50 * 100) / 100;
-  const second = Math.round(total * 0.30 * 100) / 100;
-  const third  = Math.round(total * 0.20 * 100) / 100;
+  const total  = Math.round(wager * participants * 100) / 100;
+  const third  = wager; // always breaks even
+  const remaining = Math.round((total - third) * 100) / 100;
+  const first  = Math.round(remaining * 0.625 * 100) / 100;
+  const second = Math.round((remaining - first) * 100) / 100;
   return { total, first, second, third };
 }
+
+// Track whether user has manually overridden payouts
+let payoutOverride = { first: null, second: null, third: null };
 
 function updatePayoutPreview() {
   const wager = parseFloat(document.getElementById('challengeWager').value) || 0;
   const preview = document.getElementById('payoutPreview');
+
   if (!wager || wager <= 0) {
-    preview.innerHTML = '<span>Enter wager amount to see payout breakdown</span>';
+    preview.innerHTML = '<span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>';
+    payoutOverride = { first: null, second: null, third: null };
     return;
   }
-  // Preview with assumed 4 participants (will update dynamically when people join)
+
   const assumed = 4;
   const p = calcPayout(wager, assumed);
+
+  // Use override values if set, otherwise use calculated defaults
+  const firstVal  = payoutOverride.first  ?? p.first;
+  const secondVal = payoutOverride.second ?? p.second;
+  const thirdVal  = payoutOverride.third  ?? p.third;
+  const potVal    = Math.round((firstVal + secondVal + thirdVal) * 100) / 100;
+  const warning   = potVal !== p.total
+    ? `<div style="color:var(--warn);font-size:11px;margin-top:8px;">
+        ⚠️ Custom total $${potVal} differs from pot of $${p.total}
+       </div>`
+    : '';
+
   preview.innerHTML = `
-    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">
-      Preview based on ${assumed} participants · Total pot: $${p.total}
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">
+      Preview based on ${assumed} participants · Total pot:
+      <strong style="color:var(--text)">$${p.total}</strong>
     </div>
-    <div class="payout-row">
+
+    <div class="payout-row" style="margin-bottom:10px;align-items:center;">
       <span class="payout-place">🥇 1st Place</span>
-      <span class="payout-amount">$${p.first}</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" class="input payout-input" id="payoutFirst"
+          value="${firstVal}" min="0" step="0.01"
+          style="width:90px;padding:6px 10px;text-align:right;"
+          placeholder="${p.first}"/>
+        <span style="color:var(--text3);font-size:12px;">$</span>
+      </div>
     </div>
-    <div class="payout-row">
+
+    <div class="payout-row" style="margin-bottom:10px;align-items:center;">
       <span class="payout-place">🥈 2nd Place</span>
-      <span class="payout-amount">$${p.second}</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" class="input payout-input" id="payoutSecond"
+          value="${secondVal}" min="0" step="0.01"
+          style="width:90px;padding:6px 10px;text-align:right;"
+          placeholder="${p.second}"/>
+        <span style="color:var(--text3);font-size:12px;">$</span>
+      </div>
     </div>
-    <div class="payout-row">
+
+    <div class="payout-row" style="align-items:center;">
       <span class="payout-place">🥉 3rd Place</span>
-      <span class="payout-amount">$${p.third}</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="number" class="input payout-input" id="payoutThird"
+          value="${thirdVal}" min="0" step="0.01"
+          style="width:90px;padding:6px 10px;text-align:right;"
+          placeholder="${p.third}"/>
+        <span style="color:var(--text3);font-size:12px;">$</span>
+      </div>
     </div>
+
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:11px;color:var(--text3);">3rd place defaults to wager amount (breaks even)</span>
+      <button type="button" id="resetPayoutBtn"
+        style="font-size:11px;color:var(--accent2);background:none;border:none;cursor:pointer;padding:0;">
+        Reset to defaults
+      </button>
+    </div>
+    ${warning}
   `;
+
+  // Listen for manual changes to payout inputs
+  ['payoutFirst','payoutSecond','payoutThird'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        payoutOverride.first  = parseFloat(document.getElementById('payoutFirst')?.value)  || 0;
+        payoutOverride.second = parseFloat(document.getElementById('payoutSecond')?.value) || 0;
+        payoutOverride.third  = parseFloat(document.getElementById('payoutThird')?.value)  || 0;
+        // Re-render warning only
+        const newPot = Math.round((payoutOverride.first + payoutOverride.second + payoutOverride.third) * 100) / 100;
+        const warnEl = preview.querySelector('#payoutWarning');
+        const warningHtml = newPot !== p.total
+          ? `<div id="payoutWarning" style="color:var(--warn);font-size:11px;margin-top:8px;">
+              ⚠️ Custom total $${newPot} differs from pot of $${p.total}
+             </div>`
+          : '';
+        // Remove old warning and append new
+        const existing = preview.querySelector('#payoutWarning');
+        if (existing) existing.remove();
+        if (warningHtml) preview.insertAdjacentHTML('beforeend', warningHtml);
+      });
+    }
+  });
+
+  // Reset button
+  document.getElementById('resetPayoutBtn')?.addEventListener('click', () => {
+    payoutOverride = { first: null, second: null, third: null };
+    updatePayoutPreview();
+  });
 }
 
-document.getElementById('challengeWager').addEventListener('input', updatePayoutPreview);
+document.getElementById('challengeWager').addEventListener('input', () => {
+  // Reset overrides when wager changes so defaults recalculate
+  payoutOverride = { first: null, second: null, third: null };
+  updatePayoutPreview();
+});
 
 // ============================================================
 //  MODE SELECTOR
@@ -208,7 +293,8 @@ document.getElementById('openCreateChallenge').addEventListener('click', () => {
 function closeCreateModal() {
   createModal.classList.remove('active');
   document.getElementById('createChallengeForm').reset();
-  document.getElementById('payoutPreview').innerHTML = 'Enter wager amount to see payout breakdown';
+  document.getElementById('payoutPreview').innerHTML = '<span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>';
+  payoutOverride = { first: null, second: null, third: null };
   // Reset mode selector
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
   document.querySelector('.mode-card[data-mode="dynamic"]').classList.add('active');
@@ -255,6 +341,13 @@ document.getElementById('createChallengeForm').addEventListener('submit', async 
 
   try {
     const inviteCode = generateCode();
+
+    // Read payout values — custom or calculated defaults
+    const defaultP     = calcPayout(wager, 4);
+    const payoutFirst  = parseFloat(document.getElementById('payoutFirst')?.value)  || defaultP.first;
+    const payoutSecond = parseFloat(document.getElementById('payoutSecond')?.value) || defaultP.second;
+    const payoutThird  = parseFloat(document.getElementById('payoutThird')?.value)  || wager;
+
     const challengeData = {
       name,
       startDate,
@@ -262,6 +355,7 @@ document.getElementById('createChallengeForm').addEventListener('submit', async 
       wager,
       mode,
       inviteCode,
+      payout: { first: payoutFirst, second: payoutSecond, third: payoutThird },
       adminId:   currentUser.uid,
       adminName: currentUser.displayName || currentUser.email,
       participants: [{
@@ -448,7 +542,14 @@ detailModal.addEventListener('click', (e) => {
 function showChallengeDetail(id, c) {
   const isAdmin  = c.adminId === currentUser?.uid;
   const count    = (c.participants || []).length;
-  const p        = calcPayout(c.wager, count);
+  // Use saved custom payout if available, otherwise calculate defaults
+  const defaultP = calcPayout(c.wager, count);
+  const p = {
+    total:  Math.round(c.wager * count * 100) / 100,
+    first:  c.payout?.first  ?? defaultP.first,
+    second: c.payout?.second ?? defaultP.second,
+    third:  c.payout?.third  ?? c.wager,
+  };
   const daysLeft = Math.max(0, Math.ceil((new Date(c.endDate) - new Date()) / 86400000));
 
   document.getElementById('detailChallengeName').textContent = c.name;
