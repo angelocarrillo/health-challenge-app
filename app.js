@@ -1,28 +1,15 @@
 // ============================================================
-//  FITWAGER — Health Challenge App
-//  Phase 1: Login + Challenge Creation
+//  FITWAGER — Health Challenge App  |  Phase 2
+//  Login + Challenge Creation + Activity Logging
 // ============================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  getDoc,
-  doc,
-  updateDoc,
-  arrayUnion,
-  query,
-  where,
-  serverTimestamp
+  getFirestore, collection, addDoc, getDocs, getDoc, doc,
+  updateDoc, setDoc, arrayUnion, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ---- FIREBASE CONFIG ----
@@ -40,6 +27,42 @@ const auth = getAuth(app);
 const db   = getFirestore(app);
 
 // ============================================================
+//  METRIC DEFINITIONS
+// ============================================================
+const METRIC_DEFS = {
+  workout: {
+    icon: '💪', label: 'Workout',
+    dynamicDesc: 'Goal adjusts based on avg weekly frequency',
+    classicDesc: 'Points per workout session (max 5/week)',
+    classicDefault: 2, classicUnit: 'pts per session',
+  },
+  steps: {
+    icon: '👟', label: 'Steps',
+    dynamicDesc: 'Goal adjusts based on avg daily steps',
+    classicDesc: 'Points for hitting daily step goal',
+    classicDefault: 1.5, classicUnit: 'pts per day',
+  },
+  sleep: {
+    icon: '😴', label: 'Sleep',
+    dynamicDesc: 'Goal adjusts based on avg hours slept (min 5h, max 8h)',
+    classicDesc: 'Points for hitting nightly sleep goal',
+    classicDefault: 1, classicUnit: 'pts per night',
+  },
+  water: {
+    icon: '💧', label: 'Water',
+    dynamicDesc: 'Goal adjusts based on avg daily cups (min 8, max 15)',
+    classicDesc: 'Points for hitting daily water goal',
+    classicDefault: 1, classicUnit: 'pts per day',
+  },
+  macros: {
+    icon: '🥗', label: 'Macros',
+    dynamicDesc: 'Tracked for personal awareness — no points',
+    classicDesc: 'Tracked for personal awareness — no points',
+    classicDefault: 0, classicUnit: 'tracking only',
+  },
+};
+
+// ============================================================
 //  THEME TOGGLE
 // ============================================================
 const themeToggle = document.getElementById('themeToggle');
@@ -50,18 +73,13 @@ function setTheme(theme) {
   themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
   localStorage.setItem('fw-theme', theme);
 }
-
-// Load saved theme
-const savedTheme = localStorage.getItem('fw-theme') || 'dark';
-setTheme(savedTheme);
-
+setTheme(localStorage.getItem('fw-theme') || 'dark');
 themeToggle.addEventListener('click', () => {
-  const current = document.documentElement.getAttribute('data-theme');
-  setTheme(current === 'dark' ? 'light' : 'dark');
+  setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 });
 
 // ============================================================
-//  SCREEN HELPERS
+//  SCREEN / PAGE HELPERS
 // ============================================================
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -71,10 +89,9 @@ function showScreen(id) {
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-  const page = document.getElementById(`page-${name}`);
-  if (page) page.classList.add('active');
-  const link = document.querySelector(`.nav-link[data-page="${name}"]`);
-  if (link) link.classList.add('active');
+  document.getElementById(`page-${name}`)?.classList.add('active');
+  document.querySelector(`.nav-link[data-page="${name}"]`)?.classList.add('active');
+  if (name === 'log') refreshLogPage();
 }
 window.showPage = showPage;
 
@@ -84,18 +101,11 @@ window.showPage = showPage;
 let currentUser = null;
 
 document.getElementById('googleSignInBtn').addEventListener('click', async () => {
-  const provider = new GoogleAuthProvider();
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (err) {
-    console.error('Sign in error:', err);
-    alert('Sign in failed. Please try again.');
-  }
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (err) { console.error(err); alert('Sign in failed. Please try again.'); }
 });
 
-document.getElementById('signOutBtn').addEventListener('click', async () => {
-  await signOut(auth);
-});
+document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
@@ -114,13 +124,10 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // ============================================================
-//  NAV LINKS
+//  NAV
 // ============================================================
 document.querySelectorAll('.nav-link').forEach(link => {
-  link.addEventListener('click', (e) => {
-    e.preventDefault();
-    showPage(link.dataset.page);
-  });
+  link.addEventListener('click', (e) => { e.preventDefault(); showPage(link.dataset.page); });
 });
 
 // ============================================================
@@ -128,122 +135,130 @@ document.querySelectorAll('.nav-link').forEach(link => {
 // ============================================================
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
-    const tabName = tab.dataset.tab;
+    const name = tab.dataset.tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     tab.classList.add('active');
-    document.getElementById(`tab-${tabName}`).classList.add('active');
+    document.getElementById(`tab-${name}`)?.classList.add('active');
   });
 });
 
 // ============================================================
 //  PAYOUT CALCULATOR
-//  Rules:
-//   - 3rd place always gets their wager back (fixed)
-//   - Remaining pot = total - wager
-//   - 1st and 2nd split the remaining by admin-set percentage
-//   - Payouts update live as participants join
 // ============================================================
-
-// Default 1st/2nd split: 65% / 35% of remaining pot
 let firstSplitPct = 65;
 
 function calcPayout(wager, participants, firstPct = firstSplitPct) {
-  const secondPct  = 100 - firstPct;
-  const total      = Math.round(wager * participants * 100) / 100;
-  const third      = wager; // always breaks even
-  const remaining  = Math.round((total - third) * 100) / 100;
-  const first      = Math.round(remaining * (firstPct / 100) * 100) / 100;
-  const second     = Math.round((remaining - first) * 100) / 100;
+  const secondPct = 100 - firstPct;
+  const total     = Math.round(wager * participants * 100) / 100;
+  const third     = wager;
+  const remaining = Math.round((total - third) * 100) / 100;
+  const first     = Math.round(remaining * (firstPct / 100) * 100) / 100;
+  const second    = Math.round((remaining - first) * 100) / 100;
   return { total, remaining, first, second, third, firstPct, secondPct };
 }
 
 function updatePayoutPreview() {
   const wager   = parseFloat(document.getElementById('challengeWager').value) || 0;
   const preview = document.getElementById('payoutPreview');
-
   if (!wager || wager <= 0) {
     preview.innerHTML = '<span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>';
     return;
   }
-
-  // Show live preview for a range of participant counts
   const counts  = [2, 3, 4, 5, 6];
-  const current = firstSplitPct;
-  const second  = 100 - current;
-
-  // Build rows for each participant count
-  const rows = counts.map(n => {
-    const p = calcPayout(wager, n, current);
-    return `
-      <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:7px 8px;color:var(--text2);font-size:13px;">${n} people</td>
-        <td style="padding:7px 8px;font-weight:600;color:var(--accent);font-family:'Syne',sans-serif;">$${p.total}</td>
-        <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.first}</td>
-        <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.second}</td>
-        <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.third}</td>
-      </tr>`;
+  const cur     = firstSplitPct;
+  const sec     = 100 - cur;
+  const rows    = counts.map(n => {
+    const p = calcPayout(wager, n, cur);
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:7px 8px;color:var(--text2);font-size:13px;">${n} people</td>
+      <td style="padding:7px 8px;font-weight:600;color:var(--accent);font-family:'Syne',sans-serif;">$${p.total}</td>
+      <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.first}</td>
+      <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.second}</td>
+      <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.third}</td>
+    </tr>`;
   }).join('');
-
   preview.innerHTML = `
     <div style="margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;">
-          1st / 2nd Split of Remaining Pot
-        </span>
-        <button type="button" id="resetSplitBtn"
-          style="font-size:11px;color:var(--accent2);background:none;border:none;cursor:pointer;padding:0;">
-          Reset to 65/35
-        </button>
+        <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;">1st / 2nd Split of Remaining Pot</span>
+        <button type="button" id="resetSplitBtn" style="font-size:11px;color:var(--accent2);background:none;border:none;cursor:pointer;padding:0;">Reset to 65/35</button>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
         <span style="font-size:13px;color:var(--text2);">🥇 1st</span>
-        <input type="range" id="splitSlider" min="50" max="90" step="5"
-          value="${current}"
-          style="flex:1;accent-color:var(--accent);cursor:pointer;"/>
+        <input type="range" id="splitSlider" min="50" max="90" step="5" value="${cur}" style="flex:1;accent-color:var(--accent);cursor:pointer;"/>
         <span style="font-size:13px;color:var(--text2);">🥈 2nd</span>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:6px;">
-        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent);">${current}%</span>
+        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent);">${cur}%</span>
         <span style="font-size:11px;color:var(--text3);align-self:center;">of remaining after 3rd</span>
-        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent2);">${second}%</span>
+        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent2);">${sec}%</span>
       </div>
     </div>
-
-    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">
-      🥉 3rd place always gets <strong style="color:var(--text);">$${wager}</strong> back (their wager) · Payouts update live as people join
-    </div>
-
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">🥉 3rd always gets <strong style="color:var(--text);">$${wager}</strong> back · Payouts update live as people join</div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr style="border-bottom:1px solid var(--border);">
-            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Participants</th>
-            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Pot</th>
-            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥇 1st</th>
-            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥈 2nd</th>
-            <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥉 3rd</th>
-          </tr>
-        </thead>
+        <thead><tr style="border-bottom:1px solid var(--border);">
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Participants</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Pot</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥇 1st</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥈 2nd</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥉 3rd</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-    </div>
-  `;
-
-  // Slider interaction — update split % live
+    </div>`;
   document.getElementById('splitSlider')?.addEventListener('input', (e) => {
-    firstSplitPct = parseInt(e.target.value);
-    updatePayoutPreview();
+    firstSplitPct = parseInt(e.target.value); updatePayoutPreview();
   });
-
-  // Reset split button
   document.getElementById('resetSplitBtn')?.addEventListener('click', () => {
-    firstSplitPct = 65;
-    updatePayoutPreview();
+    firstSplitPct = 65; updatePayoutPreview();
   });
 }
-
 document.getElementById('challengeWager').addEventListener('input', updatePayoutPreview);
+
+// ============================================================
+//  METRIC TOGGLES (challenge creation)
+// ============================================================
+function getActiveMetrics() {
+  return [...document.querySelectorAll('.metric-toggle.active')].map(el => el.dataset.metric);
+}
+
+document.querySelectorAll('.metric-toggle').forEach(toggle => {
+  toggle.addEventListener('click', () => {
+    toggle.classList.toggle('active');
+    updateClassicPointConfig();
+  });
+});
+
+function updateClassicPointConfig() {
+  const mode    = document.getElementById('challengeMode').value;
+  const metrics = getActiveMetrics();
+  const config  = document.getElementById('classicPointConfig');
+  const fields  = document.getElementById('classicPointFields');
+
+  if (mode !== 'classic' || metrics.length === 0) {
+    config.style.display = 'none';
+    return;
+  }
+  config.style.display = 'block';
+  fields.innerHTML = metrics
+    .filter(m => m !== 'macros')
+    .map(m => {
+      const def = METRIC_DEFS[m];
+      return `
+        <div class="config-row">
+          <span class="config-row-icon">${def.icon}</span>
+          <div style="flex:1;">
+            <div class="config-row-label">${def.label}</div>
+            <div style="font-size:11px;color:var(--text3);">${def.classicDesc}</div>
+          </div>
+          <input type="number" class="input config-row-input" id="classic_${m}"
+            value="${def.classicDefault}" min="0" max="10" step="0.5"/>
+          <span class="config-row-unit">${def.classicUnit}</span>
+        </div>`;
+    }).join('');
+}
 
 // ============================================================
 //  MODE SELECTOR
@@ -253,6 +268,7 @@ document.querySelectorAll('.mode-card').forEach(card => {
     document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
     card.classList.add('active');
     document.getElementById('challengeMode').value = card.dataset.mode;
+    updateClassicPointConfig();
   });
 });
 
@@ -262,24 +278,27 @@ document.querySelectorAll('.mode-card').forEach(card => {
 const createModal = document.getElementById('createChallengeModal');
 
 document.getElementById('openCreateChallenge').addEventListener('click', () => {
-  createModal.classList.add('active');
-  // Set default dates to current month
-  const now = new Date();
+  const now      = new Date();
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
   const lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
   document.getElementById('challengeStart').value = firstDay;
   document.getElementById('challengeEnd').value   = lastDay;
+  createModal.classList.add('active');
 });
 
 function closeCreateModal() {
   createModal.classList.remove('active');
   document.getElementById('createChallengeForm').reset();
   document.getElementById('payoutPreview').innerHTML = '<span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>';
+  document.getElementById('classicPointConfig').style.display = 'none';
   firstSplitPct = 65;
-  // Reset mode selector
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
   document.querySelector('.mode-card[data-mode="dynamic"]').classList.add('active');
   document.getElementById('challengeMode').value = 'dynamic';
+  // Reset metric toggles to default (workout + steps active)
+  document.querySelectorAll('.metric-toggle').forEach(t => {
+    t.classList.toggle('active', ['workout','steps'].includes(t.dataset.metric));
+  });
 }
 
 document.getElementById('closeCreateChallenge').addEventListener('click', closeCreateModal);
@@ -295,7 +314,7 @@ function generateCode() {
 }
 
 // ============================================================
-//  CREATE CHALLENGE — FIRESTORE
+//  CREATE CHALLENGE
 // ============================================================
 document.getElementById('createChallengeForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -306,14 +325,19 @@ document.getElementById('createChallengeForm').addEventListener('submit', async 
   const endDate   = document.getElementById('challengeEnd').value;
   const wager     = parseFloat(document.getElementById('challengeWager').value);
   const mode      = document.getElementById('challengeMode').value;
+  const metrics   = getActiveMetrics();
 
-  if (!name || !startDate || !endDate || !wager) {
-    alert('Please fill in all fields.');
-    return;
-  }
-  if (new Date(startDate) >= new Date(endDate)) {
-    alert('End date must be after start date.');
-    return;
+  if (!name || !startDate || !endDate || !wager) { alert('Please fill in all fields.'); return; }
+  if (new Date(startDate) >= new Date(endDate)) { alert('End date must be after start date.'); return; }
+  if (metrics.length === 0) { alert('Please select at least one active metric.'); return; }
+
+  // Collect classic point values if applicable
+  const classicPoints = {};
+  if (mode === 'classic') {
+    metrics.forEach(m => {
+      const el = document.getElementById(`classic_${m}`);
+      classicPoints[m] = el ? parseFloat(el.value) || 0 : 0;
+    });
   }
 
   const submitBtn = e.target.querySelector('[type="submit"]');
@@ -321,34 +345,23 @@ document.getElementById('createChallengeForm').addEventListener('submit', async 
   submitBtn.disabled = true;
 
   try {
-    const inviteCode = generateCode();
-
-    // Save payout structure as percentages so it scales with any participant count
     const challengeData = {
-      name,
-      startDate,
-      endDate,
-      wager,
-      mode,
-      inviteCode,
-      payout: { firstSplitPct: firstSplitPct },
+      name, startDate, endDate, wager, mode, metrics,
+      inviteCode: generateCode(),
+      payout: { firstSplitPct },
+      classicPoints: mode === 'classic' ? classicPoints : {},
       adminId:   currentUser.uid,
       adminName: currentUser.displayName || currentUser.email,
       participants: [{
-        uid:    currentUser.uid,
-        name:   currentUser.displayName || currentUser.email,
-        email:  currentUser.email,
-        photo:  currentUser.photoURL || '',
-        role:   'admin',
-        joinedAt: new Date().toISOString()
+        uid: currentUser.uid, name: currentUser.displayName || currentUser.email,
+        email: currentUser.email, photo: currentUser.photoURL || '',
+        role: 'admin', joinedAt: new Date().toISOString()
       }],
       createdAt: serverTimestamp(),
       status: 'active'
     };
 
     const docRef = await addDoc(collection(db, 'challenges'), challengeData);
-    console.log('Challenge created:', docRef.id);
-
     closeCreateModal();
     await loadMyChallenges();
     await loadDashboard();
@@ -356,7 +369,7 @@ document.getElementById('createChallengeForm').addEventListener('submit', async 
     showChallengeDetail(docRef.id, {...challengeData, id: docRef.id});
 
   } catch (err) {
-    console.error('Error creating challenge:', err);
+    console.error(err);
     alert('Failed to create challenge. Please try again.');
   } finally {
     submitBtn.textContent = 'Create Challenge ⚡';
@@ -371,47 +384,27 @@ async function loadMyChallenges() {
   if (!currentUser) return;
   const listEl = document.getElementById('myChallengesList');
   listEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);">Loading...</div>';
-
   try {
-    // Get challenges where user is admin
-    const adminQ = query(collection(db, 'challenges'), where('adminId', '==', currentUser.uid));
-    const adminSnap = await getDocs(adminQ);
-
-    let challenges = [];
-    adminSnap.forEach(d => challenges.push({id: d.id, ...d.data()}));
-
-    // Also get challenges where user is a participant (but not admin)
     const allSnap = await getDocs(collection(db, 'challenges'));
+    const challenges = [];
     allSnap.forEach(d => {
       const data = d.data();
-      if (data.adminId !== currentUser.uid) {
-        const isParticipant = (data.participants || []).some(p => p.uid === currentUser.uid);
-        if (isParticipant) challenges.push({id: d.id, ...data});
-      }
+      const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
+      if (isMember) challenges.push({id: d.id, ...data});
     });
-
     if (challenges.length === 0) {
-      listEl.innerHTML = `
-        <div class="empty-state">
-          <span>💪</span>
-          <p>No challenges yet. Create your first one!</p>
-        </div>`;
+      listEl.innerHTML = '<div class="empty-state"><span>💪</span><p>No challenges yet. Create your first one!</p></div>';
       return;
     }
-
     listEl.innerHTML = challenges.map(c => renderChallengeCard(c)).join('');
-
-    // Attach click handlers
     listEl.querySelectorAll('.challenge-card').forEach(card => {
-      card.addEventListener('click', async () => {
-        const cid = card.dataset.id;
-        const challenge = challenges.find(c => c.id === cid);
-        if (challenge) showChallengeDetail(cid, challenge);
+      card.addEventListener('click', () => {
+        const c = challenges.find(x => x.id === card.dataset.id);
+        if (c) showChallengeDetail(c.id, c);
       });
     });
-
   } catch (err) {
-    console.error('Error loading challenges:', err);
+    console.error(err);
     listEl.innerHTML = '<div class="empty-state"><span>⚠️</span><p>Failed to load challenges.</p></div>';
   }
 }
@@ -421,7 +414,7 @@ function renderChallengeCard(c) {
   const count     = (c.participants || []).length;
   const daysLeft  = Math.max(0, Math.ceil((new Date(c.endDate) - new Date()) / 86400000));
   const modeLabel = c.mode === 'dynamic' ? '⚡ Dynamic' : '📋 Classic';
-
+  const metricIcons = (c.metrics || ['workout','steps']).map(m => METRIC_DEFS[m]?.icon || '').join(' ');
   return `
     <div class="challenge-card" data-id="${c.id}">
       <div class="challenge-card-name">${escHtml(c.name)}</div>
@@ -430,9 +423,8 @@ function renderChallengeCard(c) {
         ${isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span class="badge badge-purple">Participant</span>'}
         <span class="badge badge-warn">${daysLeft > 0 ? daysLeft + ' days left' : 'Ended'}</span>
       </div>
-      <div style="font-size:13px;color:var(--text2);">
-        ${formatDate(c.startDate)} → ${formatDate(c.endDate)}
-      </div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${formatDate(c.startDate)} → ${formatDate(c.endDate)}</div>
+      <div style="font-size:16px;margin-bottom:4px;">${metricIcons}</div>
       <div class="challenge-card-footer">
         <span class="participant-count">👥 ${count} participant${count !== 1 ? 's' : ''}</span>
         <span class="wager-amount">$${c.wager}/person</span>
@@ -446,109 +438,74 @@ function renderChallengeCard(c) {
 async function loadDashboard() {
   if (!currentUser) return;
   try {
-    // Collect all challenges this user is part of
     const allSnap = await getDocs(collection(db, 'challenges'));
-    let active = 0, totalPoints = 0, bestRank = '—', minDays = Infinity;
+    let active = 0, minDays = Infinity;
     const now = new Date();
+    const activeChallenges = [];
 
     allSnap.forEach(d => {
       const data = d.data();
-      const isParticipant = (data.participants || []).some(p => p.uid === currentUser.uid);
-      if (!isParticipant) return;
-
+      const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
+      if (!isMember) return;
       const end = new Date(data.endDate);
       if (end >= now && data.status === 'active') {
         active++;
         const days = Math.ceil((end - now) / 86400000);
         if (days < minDays) minDays = days;
-      }
-    });
-
-    document.getElementById('statActiveChallenges').textContent = active;
-    document.getElementById('statTotalPoints').textContent = totalPoints || '0';
-    document.getElementById('statCurrentRank').textContent = bestRank;
-    document.getElementById('statDaysLeft').textContent = minDays === Infinity ? '—' : minDays;
-
-    // Active challenges summary
-    const listEl = document.getElementById('activeChallengesList');
-    const activeChallenges = [];
-    allSnap.forEach(d => {
-      const data = d.data();
-      const isParticipant = (data.participants || []).some(p => p.uid === currentUser.uid);
-      if (isParticipant && new Date(data.endDate) >= now) {
         activeChallenges.push({id: d.id, ...data});
       }
     });
 
+    document.getElementById('statActiveChallenges').textContent = active;
+    document.getElementById('statTotalPoints').textContent = '—';
+    document.getElementById('statCurrentRank').textContent = '—';
+    document.getElementById('statDaysLeft').textContent = minDays === Infinity ? '—' : minDays;
+
+    const listEl = document.getElementById('activeChallengesList');
     if (activeChallenges.length === 0) {
-      listEl.innerHTML = `
-        <div class="empty-state">
-          <span>🏁</span>
-          <p>No active challenges yet.<br/>Create one or join via invite!</p>
-          <button class="btn-primary" onclick="showPage('challenges')">Browse Challenges</button>
-        </div>`;
+      listEl.innerHTML = `<div class="empty-state"><span>🏁</span><p>No active challenges yet.<br/>Create one or join via invite!</p><button class="btn-primary" onclick="showPage('challenges')">Browse Challenges</button></div>`;
     } else {
       listEl.innerHTML = activeChallenges.map(c => renderChallengeCard(c)).join('');
       listEl.querySelectorAll('.challenge-card').forEach(card => {
-        card.addEventListener('click', async () => {
-          const cid = card.dataset.id;
-          const challenge = activeChallenges.find(c => c.id === cid);
-          if (challenge) showChallengeDetail(cid, challenge);
+        card.addEventListener('click', () => {
+          const c = activeChallenges.find(x => x.id === card.dataset.id);
+          if (c) showChallengeDetail(c.id, c);
         });
       });
     }
-
-  } catch (err) {
-    console.error('Dashboard load error:', err);
-  }
+  } catch (err) { console.error(err); }
 }
 
 // ============================================================
 //  CHALLENGE DETAIL MODAL
 // ============================================================
 const detailModal = document.getElementById('challengeDetailModal');
-
-document.getElementById('closeDetailModal').addEventListener('click', () => {
-  detailModal.classList.remove('active');
-});
-detailModal.addEventListener('click', (e) => {
-  if (e.target === detailModal) detailModal.classList.remove('active');
-});
+document.getElementById('closeDetailModal').addEventListener('click', () => detailModal.classList.remove('active'));
+detailModal.addEventListener('click', (e) => { if (e.target === detailModal) detailModal.classList.remove('active'); });
 
 function showChallengeDetail(id, c) {
-  const isAdmin     = c.adminId === currentUser?.uid;
-  const count       = (c.participants || []).length;
-  const splitPct    = c.payout?.firstSplitPct ?? 65;
-  const p           = calcPayout(c.wager, count, splitPct);
-  const daysLeft    = Math.max(0, Math.ceil((new Date(c.endDate) - new Date()) / 86400000));
+  const isAdmin  = c.adminId === currentUser?.uid;
+  const count    = (c.participants || []).length;
+  const splitPct = c.payout?.firstSplitPct ?? 65;
+  const p        = calcPayout(c.wager, count, splitPct);
+  const daysLeft = Math.max(0, Math.ceil((new Date(c.endDate) - new Date()) / 86400000));
+  const metrics  = c.metrics || ['workout','steps'];
 
   document.getElementById('detailChallengeName').textContent = c.name;
-
   document.getElementById('challengeDetailBody').innerHTML = `
     <div class="detail-grid">
-      <div class="detail-item">
-        <label>Point System</label>
-        <span>${c.mode === 'dynamic' ? '⚡ Dynamic' : '📋 Classic'}</span>
-      </div>
-      <div class="detail-item">
-        <label>Wager</label>
-        <span>$${c.wager} per person</span>
-      </div>
-      <div class="detail-item">
-        <label>Start Date</label>
-        <span>${formatDate(c.startDate)}</span>
-      </div>
-      <div class="detail-item">
-        <label>End Date</label>
-        <span>${formatDate(c.endDate)}</span>
-      </div>
-      <div class="detail-item">
-        <label>Days Remaining</label>
-        <span>${daysLeft > 0 ? daysLeft + ' days' : 'Ended'}</span>
-      </div>
-      <div class="detail-item">
-        <label>Total Pot</label>
-        <span>$${p.total}</span>
+      <div class="detail-item"><label>Point System</label><span>${c.mode === 'dynamic' ? '⚡ Dynamic' : '📋 Classic'}</span></div>
+      <div class="detail-item"><label>Wager</label><span>$${c.wager} per person</span></div>
+      <div class="detail-item"><label>Start Date</label><span>${formatDate(c.startDate)}</span></div>
+      <div class="detail-item"><label>End Date</label><span>${formatDate(c.endDate)}</span></div>
+      <div class="detail-item"><label>Days Remaining</label><span>${daysLeft > 0 ? daysLeft + ' days' : 'Ended'}</span></div>
+      <div class="detail-item"><label>Total Pot</label><span>$${p.total}</span></div>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <div class="section-title" style="margin-top:0;">Active Metrics</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${metrics.map(m => `<span class="badge badge-accent">${METRIC_DEFS[m]?.icon} ${METRIC_DEFS[m]?.label}</span>`).join('')}
       </div>
     </div>
 
@@ -559,131 +516,633 @@ function showChallengeDetail(id, c) {
         <span class="invite-code">${c.inviteCode}</span>
         <button class="btn-copy" onclick="copyCode('${c.inviteCode}')">Copy</button>
       </div>
-      <p style="font-size:12px;color:var(--text3);margin-top:8px;">
-        Participants go to Challenges → Join via Code and enter this code
-      </p>
+      <p style="font-size:12px;color:var(--text3);margin-top:8px;">Participants go to Challenges → Join via Code and enter this code</p>
     </div>` : ''}
 
-    <div style="margin-bottom:12px;">
-      <div class="section-title" style="margin-top:0;">Live Payout Breakdown · ${count} participant${count !== 1 ? 's' : ''} · $${p.total} pot</div>
+    <div style="margin-bottom:20px;">
+      <div class="section-title" style="margin-top:0;">Live Payout · ${count} participant${count !== 1 ? 's' : ''} · $${p.total} pot</div>
       <div class="payout-preview">
         <div class="payout-row" style="margin-bottom:8px;">
           <span class="payout-place">🥇 1st Place</span>
-          <div style="text-align:right;">
-            <span class="payout-amount">$${p.first}</span>
-            <div style="font-size:11px;color:var(--text3);">${p.firstPct}% of remaining pot</div>
-          </div>
+          <div style="text-align:right;"><span class="payout-amount">$${p.first}</span><div style="font-size:11px;color:var(--text3);">${p.firstPct}% of remaining pot</div></div>
         </div>
         <div class="payout-row" style="margin-bottom:8px;">
           <span class="payout-place">🥈 2nd Place</span>
-          <div style="text-align:right;">
-            <span class="payout-amount">$${p.second}</span>
-            <div style="font-size:11px;color:var(--text3);">${p.secondPct}% of remaining pot</div>
-          </div>
+          <div style="text-align:right;"><span class="payout-amount">$${p.second}</span><div style="font-size:11px;color:var(--text3);">${p.secondPct}% of remaining pot</div></div>
         </div>
         <div class="payout-row">
           <span class="payout-place">🥉 3rd Place</span>
-          <div style="text-align:right;">
-            <span class="payout-amount">$${p.third}</span>
-            <div style="font-size:11px;color:var(--text3);">Wager returned (breaks even)</div>
-          </div>
+          <div style="text-align:right;"><span class="payout-amount">$${p.third}</span><div style="font-size:11px;color:var(--text3);">Wager returned (breaks even)</div></div>
         </div>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);">
-          💡 Payout amounts update automatically as more participants join
-        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);">💡 Amounts update automatically as more participants join</div>
       </div>
     </div>
 
     <div class="section-title">Participants (${count})</div>
     <div class="participants-list">
-      ${(c.participants || []).map(p => `
+      ${(c.participants || []).map(pt => `
         <div class="participant-item">
           <div class="participant-avatar">
-            ${p.photo
-              ? `<img src="${p.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'">`
-              : escHtml((p.name || '?')[0].toUpperCase())}
+            ${pt.photo ? `<img src="${pt.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'">` : escHtml((pt.name||'?')[0].toUpperCase())}
           </div>
-          <span class="participant-name">${escHtml(p.name || p.email)}</span>
-          <span class="participant-role">${p.role === 'admin' ? '👑 Admin' : 'Participant'}</span>
+          <span class="participant-name">${escHtml(pt.name || pt.email)}</span>
+          <span class="participant-role">${pt.role === 'admin' ? '👑 Admin' : 'Participant'}</span>
         </div>`).join('')}
-    </div>
-  `;
-
+    </div>`;
   detailModal.classList.add('active');
 }
 
 window.copyCode = function(code) {
-  navigator.clipboard.writeText(code).then(() => {
-    alert(`Invite code "${code}" copied to clipboard!`);
-  });
+  navigator.clipboard.writeText(code).then(() => alert(`Invite code "${code}" copied!`));
 };
 
 // ============================================================
 //  JOIN CHALLENGE
 // ============================================================
 document.getElementById('joinChallengeBtn').addEventListener('click', async () => {
-  const code = document.getElementById('inviteCodeInput').value.trim().toUpperCase();
+  const code  = document.getElementById('inviteCodeInput').value.trim().toUpperCase();
   const msgEl = document.getElementById('joinMessage');
-
   if (!code || code.length !== 6) {
     msgEl.className = 'join-message error';
-    msgEl.textContent = '⚠️ Please enter a valid 6-character invite code.';
-    return;
+    msgEl.textContent = '⚠️ Please enter a valid 6-character invite code.'; return;
   }
-
   msgEl.className = 'join-message';
   msgEl.textContent = 'Looking up challenge...';
-
   try {
-    const q = query(collection(db, 'challenges'), where('inviteCode', '==', code));
-    const snap = await getDocs(q);
-
+    const snap = await getDocs(query(collection(db, 'challenges'), where('inviteCode', '==', code)));
     if (snap.empty) {
       msgEl.className = 'join-message error';
-      msgEl.textContent = '❌ No challenge found with that code. Double-check and try again.';
-      return;
+      msgEl.textContent = '❌ No challenge found with that code.'; return;
     }
-
-    const docSnap = snap.docs[0];
+    const docSnap   = snap.docs[0];
     const challenge = docSnap.data();
-
-    // Check if already a participant
-    const already = (challenge.participants || []).some(p => p.uid === currentUser.uid);
-    if (already) {
+    if ((challenge.participants || []).some(p => p.uid === currentUser.uid)) {
       msgEl.className = 'join-message error';
-      msgEl.textContent = '✅ You\'re already in this challenge!';
-      return;
+      msgEl.textContent = '✅ You\'re already in this challenge!'; return;
     }
-
-    // Add user to participants
     await updateDoc(doc(db, 'challenges', docSnap.id), {
       participants: arrayUnion({
-        uid:      currentUser.uid,
-        name:     currentUser.displayName || currentUser.email,
-        email:    currentUser.email,
-        photo:    currentUser.photoURL || '',
-        role:     'participant',
-        joinedAt: new Date().toISOString()
+        uid: currentUser.uid, name: currentUser.displayName || currentUser.email,
+        email: currentUser.email, photo: currentUser.photoURL || '',
+        role: 'participant', joinedAt: new Date().toISOString()
       })
     });
-
     msgEl.className = 'join-message success';
     msgEl.textContent = `🎉 You've joined "${challenge.name}"!`;
     document.getElementById('inviteCodeInput').value = '';
-
     await loadMyChallenges();
     await loadDashboard();
-
   } catch (err) {
-    console.error('Join error:', err);
+    console.error(err);
     msgEl.className = 'join-message error';
     msgEl.textContent = '❌ Something went wrong. Please try again.';
   }
 });
 
 // ============================================================
+//  LOG PAGE — STATE
+// ============================================================
+let logState = {
+  challenge: null,     // current challenge object
+  baseline:  null,     // user's baseline for this challenge (dynamic mode)
+  entries:   {},       // { 'YYYY-MM-DD': entryObject }
+  workoutType: null,   // selected workout type for current log
+};
+
+// ============================================================
+//  LOG PAGE — REFRESH
+// ============================================================
+async function refreshLogPage() {
+  if (!currentUser) return;
+
+  // Populate challenge selector with user's active challenges
+  const select = document.getElementById('logChallengeSelect');
+  const prev   = select.value;
+  select.innerHTML = '<option value="">— Choose a challenge to log for —</option>';
+
+  try {
+    const allSnap = await getDocs(collection(db, 'challenges'));
+    const now = new Date();
+    allSnap.forEach(d => {
+      const data = d.data();
+      const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
+      if (isMember && new Date(data.endDate) >= now) {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = data.name;
+        select.appendChild(opt);
+      }
+    });
+    // Restore previous selection if still valid
+    if (prev && [...select.options].some(o => o.value === prev)) {
+      select.value = prev;
+      await onChallengeSelected(prev);
+    }
+  } catch (err) { console.error(err); }
+}
+
+document.getElementById('logChallengeSelect').addEventListener('change', async (e) => {
+  await onChallengeSelected(e.target.value);
+});
+
+async function onChallengeSelected(challengeId) {
+  const container = document.getElementById('logFormContainer');
+  if (!challengeId) { container.style.display = 'none'; return; }
+
+  container.style.display = 'block';
+  logState.challenge = null;
+  logState.baseline  = null;
+  logState.entries   = {};
+
+  // Load challenge data
+  const snap = await getDoc(doc(db, 'challenges', challengeId));
+  if (!snap.exists()) return;
+  logState.challenge = { id: snap.id, ...snap.data() };
+
+  // Load user's baseline (dynamic mode only)
+  if (logState.challenge.mode === 'dynamic') {
+    const bSnap = await getDoc(doc(db, 'challenges', challengeId, 'baselines', currentUser.uid));
+    logState.baseline = bSnap.exists() ? bSnap.data() : null;
+  }
+
+  // Load all entries for this user in this challenge
+  const eSnap = await getDocs(
+    query(collection(db, 'activityLogs'),
+      where('challengeId', '==', challengeId),
+      where('userId', '==', currentUser.uid))
+  );
+  eSnap.forEach(d => { logState.entries[d.data().date] = { id: d.id, ...d.data() }; });
+
+  // Set today's date
+  const todayStr = toDateStr(new Date());
+  document.getElementById('logDate').value = todayStr;
+  document.getElementById('logDate').max = todayStr;
+  document.getElementById('logDate').min = logState.challenge.startDate;
+
+  renderLogForm();
+}
+
+document.getElementById('logDate').addEventListener('change', () => renderLogForm());
+
+// ============================================================
+//  RENDER LOG FORM
+// ============================================================
+function renderLogForm() {
+  const c        = logState.challenge;
+  if (!c) return;
+
+  const dateStr  = document.getElementById('logDate').value;
+  const existing = logState.entries[dateStr] || null;
+  const metrics  = c.metrics || ['workout','steps'];
+
+  // Date status
+  const statusEl = document.getElementById('logDateStatus');
+  if (existing) {
+    statusEl.className = 'log-date-status existing';
+    statusEl.textContent = '✏️ Entry exists — saving will replace it';
+    document.getElementById('existingEntryNote').textContent = '⚠️ This will replace your existing entry for this date';
+  } else {
+    statusEl.className = 'log-date-status new';
+    statusEl.textContent = '✅ No entry yet for this date';
+    document.getElementById('existingEntryNote').textContent = '';
+  }
+
+  // Dynamic mode — check baseline
+  const baselinePrompt = document.getElementById('baselinePrompt');
+  const dailyLogForm   = document.getElementById('dailyLogForm');
+
+  if (c.mode === 'dynamic' && !logState.baseline) {
+    baselinePrompt.style.display = 'block';
+    dailyLogForm.style.display   = 'none';
+    renderBaselineFields(metrics);
+    return;
+  }
+
+  baselinePrompt.style.display = 'none';
+  dailyLogForm.style.display   = 'block';
+
+  // Render metric sections
+  const sectionsEl = document.getElementById('metricSections');
+  sectionsEl.innerHTML = metrics.map(m => renderMetricSection(m, c, dateStr, existing)).join('');
+
+  // Restore existing values if editing
+  if (existing) populateExistingEntry(existing, metrics);
+
+  // Attach listeners for live point preview
+  attachLogListeners(metrics, c, dateStr);
+  updatePointsPreview(metrics, c, dateStr);
+}
+
+// ============================================================
+//  BASELINE FIELDS
+// ============================================================
+function renderBaselineFields(metrics) {
+  const fields = document.getElementById('baselineFields');
+  const defs   = {
+    workout: { label: 'Average workout days per week last month', sub: 'Enter a number from 1–5', min: 1, max: 5, step: 1, placeholder: 'e.g. 3', unit: 'days/week' },
+    steps:   { label: 'Average daily step count last month', sub: 'We\'ll add 1,000 as your starting goal', min: 500, max: 20000, step: 100, placeholder: 'e.g. 6000', unit: 'steps/day' },
+    sleep:   { label: 'Average hours of sleep per night last month', sub: 'Min goal: 5h · Max goal: 8h', min: 1, max: 12, step: 0.5, placeholder: 'e.g. 6', unit: 'hours/night' },
+    water:   { label: 'Average cups of water per day last month', sub: 'Min goal: 8 cups · Max goal: 15 cups', min: 1, max: 20, step: 1, placeholder: 'e.g. 6', unit: 'cups/day' },
+  };
+
+  fields.innerHTML = metrics
+    .filter(m => m !== 'macros' && defs[m])
+    .map(m => {
+      const d = defs[m];
+      return `
+        <div class="baseline-row">
+          <span class="baseline-row-icon">${METRIC_DEFS[m].icon}</span>
+          <div style="flex:1;">
+            <div class="baseline-row-label">${d.label}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">${d.sub}</div>
+          </div>
+          <input type="number" class="input baseline-row-input" id="baseline_${m}"
+            min="${d.min}" max="${d.max}" step="${d.step}" placeholder="${d.placeholder}"/>
+          <span style="font-size:12px;color:var(--text3);white-space:nowrap;">${d.unit}</span>
+        </div>`;
+    }).join('');
+}
+
+document.getElementById('saveBaselineBtn').addEventListener('click', async () => {
+  const c       = logState.challenge;
+  const metrics = c.metrics || ['workout','steps'];
+  const baseline = {};
+
+  for (const m of metrics.filter(x => x !== 'macros')) {
+    const val = parseFloat(document.getElementById(`baseline_${m}`)?.value);
+    if (isNaN(val) || val <= 0) {
+      alert(`Please enter a valid value for ${METRIC_DEFS[m].label}`); return;
+    }
+    baseline[m] = val;
+  }
+
+  // Calculate initial weekly goals from baseline
+  baseline.goals = computeInitialGoals(baseline, metrics);
+
+  try {
+    await setDoc(doc(db, 'challenges', c.id, 'baselines', currentUser.uid), {
+      ...baseline, userId: currentUser.uid, createdAt: serverTimestamp()
+    });
+    logState.baseline = baseline;
+    document.getElementById('baselinePrompt').style.display = 'none';
+    document.getElementById('dailyLogForm').style.display   = 'block';
+    renderLogForm();
+  } catch (err) {
+    console.error(err); alert('Failed to save baseline. Please try again.');
+  }
+});
+
+function computeInitialGoals(baseline, metrics) {
+  const goals = {};
+  if (metrics.includes('workout') && baseline.workout) {
+    goals.workout = Math.min(5, Math.max(2, Math.round(baseline.workout) + 1));
+  }
+  if (metrics.includes('steps') && baseline.steps) {
+    goals.steps = Math.min(10000, Math.max(5000, Math.round(baseline.steps / 1000) * 1000 + 1000));
+  }
+  if (metrics.includes('sleep') && baseline.sleep) {
+    goals.sleep = Math.min(8, Math.max(5, Math.floor(baseline.sleep) + 1));
+  }
+  if (metrics.includes('water') && baseline.water) {
+    goals.water = Math.min(15, Math.max(8, Math.round(baseline.water) + 1));
+  }
+  return goals;
+}
+
+// ============================================================
+//  RENDER METRIC SECTION
+// ============================================================
+function renderMetricSection(metric, challenge, dateStr, existing) {
+  const def  = METRIC_DEFS[metric];
+  const goal = getGoalForMetric(metric, challenge, dateStr);
+  const goalText = goal ? `Goal: ${formatGoal(metric, goal)}` : '';
+
+  let body = '';
+
+  if (metric === 'workout') {
+    body = `
+      <div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;">Workout Type</div>
+        <div class="workout-type-selector">
+          <button type="button" class="workout-type-btn" data-type="strength">💪 Strength</button>
+          <button type="button" class="workout-type-btn" data-type="running">🏃 Running Sport</button>
+          <button type="button" class="workout-type-btn" data-type="nonrunning">🏊 Non-Running Sport</button>
+        </div>
+      </div>
+      <div class="log-input-row">
+        <label>Did you complete a workout today?</label>
+        <select id="log_workout_done" class="input" style="max-width:140px;">
+          <option value="">Select</option>
+          <option value="yes">✅ Yes</option>
+          <option value="no">❌ No</option>
+        </select>
+      </div>`;
+  } else if (metric === 'steps') {
+    body = `
+      <div class="log-input-row">
+        <label>Step count today</label>
+        <input type="number" id="log_steps" class="input" placeholder="e.g. 8500" min="0" max="100000"/>
+        <span class="log-input-unit">steps</span>
+      </div>`;
+  } else if (metric === 'sleep') {
+    body = `
+      <div class="log-input-row">
+        <label>Hours of sleep last night</label>
+        <input type="number" id="log_sleep" class="input" placeholder="e.g. 7" min="0" max="24" step="0.5"/>
+        <span class="log-input-unit">hours</span>
+      </div>`;
+  } else if (metric === 'water') {
+    body = `
+      <div class="log-input-row">
+        <label>Cups of water today</label>
+        <input type="number" id="log_water" class="input" placeholder="e.g. 10" min="0" max="50"/>
+        <span class="log-input-unit">cups</span>
+      </div>`;
+  } else if (metric === 'macros') {
+    body = `
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Tracking only — no points awarded for macros</div>
+      <div class="macro-grid">
+        <div class="macro-field">
+          <label>Calories</label>
+          <input type="number" id="log_calories" class="input" placeholder="e.g. 2000" min="0"/>
+        </div>
+        <div class="macro-field">
+          <label>Protein (g)</label>
+          <input type="number" id="log_protein" class="input" placeholder="e.g. 150" min="0"/>
+        </div>
+        <div class="macro-field">
+          <label>Carbs (g)</label>
+          <input type="number" id="log_carbs" class="input" placeholder="e.g. 200" min="0"/>
+        </div>
+        <div class="macro-field">
+          <label>Fat (g)</label>
+          <input type="number" id="log_fat" class="input" placeholder="e.g. 70" min="0"/>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="metric-section" id="section_${metric}">
+      <div class="metric-section-header">
+        <span class="metric-section-icon">${def.icon}</span>
+        <span class="metric-section-title">${def.label}</span>
+        ${goalText ? `<span class="metric-section-goal">${goalText}</span>` : ''}
+      </div>
+      <div class="metric-section-body">${body}</div>
+    </div>`;
+}
+
+function formatGoal(metric, goal) {
+  if (metric === 'workout') return `${goal} workouts/week`;
+  if (metric === 'steps')   return `${goal.toLocaleString()} steps`;
+  if (metric === 'sleep')   return `${goal} hours`;
+  if (metric === 'water')   return `${goal} cups`;
+  return '';
+}
+
+function getGoalForMetric(metric, challenge, dateStr) {
+  if (metric === 'macros') return null;
+  if (challenge.mode === 'classic') {
+    const defaults = { workout: 5, steps: 8000, sleep: 8, water: 10 };
+    return defaults[metric] || null;
+  }
+  // Dynamic — read from baseline goals (week-adjusted in future phase)
+  return logState.baseline?.goals?.[metric] || null;
+}
+
+// ============================================================
+//  POPULATE EXISTING ENTRY
+// ============================================================
+function populateExistingEntry(entry, metrics) {
+  if (metrics.includes('workout')) {
+    if (entry.workout?.done) document.getElementById('log_workout_done').value = entry.workout.done;
+    if (entry.workout?.type) {
+      logState.workoutType = entry.workout.type;
+      document.querySelectorAll('.workout-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === entry.workout.type);
+      });
+    }
+  }
+  if (metrics.includes('steps')  && entry.steps  != null) document.getElementById('log_steps').value  = entry.steps;
+  if (metrics.includes('sleep')  && entry.sleep  != null) document.getElementById('log_sleep').value  = entry.sleep;
+  if (metrics.includes('water')  && entry.water  != null) document.getElementById('log_water').value  = entry.water;
+  if (metrics.includes('macros')) {
+    if (entry.macros?.calories != null) document.getElementById('log_calories').value = entry.macros.calories;
+    if (entry.macros?.protein  != null) document.getElementById('log_protein').value  = entry.macros.protein;
+    if (entry.macros?.carbs    != null) document.getElementById('log_carbs').value    = entry.macros.carbs;
+    if (entry.macros?.fat      != null) document.getElementById('log_fat').value      = entry.macros.fat;
+  }
+}
+
+// ============================================================
+//  ATTACH LOG LISTENERS
+// ============================================================
+function attachLogListeners(metrics, challenge, dateStr) {
+  // Workout type buttons
+  document.querySelectorAll('.workout-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      logState.workoutType = btn.dataset.type;
+      updatePointsPreview(metrics, challenge, dateStr);
+    });
+  });
+
+  // Input changes
+  const inputIds = ['log_workout_done','log_steps','log_sleep','log_water','log_calories','log_protein','log_carbs','log_fat'];
+  inputIds.forEach(id => {
+    const el = document.getElementById(id);
+    el?.addEventListener('change', () => updatePointsPreview(metrics, challenge, dateStr));
+    el?.addEventListener('input',  () => updatePointsPreview(metrics, challenge, dateStr));
+  });
+
+  // Clear button
+  document.getElementById('clearLogBtn').onclick = () => {
+    inputIds.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
+    logState.workoutType = null;
+    updatePointsPreview(metrics, challenge, dateStr);
+  };
+
+  // Submit button
+  document.getElementById('submitLogBtn').onclick = () => submitLog(metrics, challenge, dateStr);
+}
+
+// ============================================================
+//  POINT CALCULATION ENGINE
+// ============================================================
+function calcPointsForEntry(metrics, challenge, dateStr) {
+  const c       = challenge;
+  const mode    = c.mode;
+  const results = {};
+  let total     = 0;
+
+  for (const metric of metrics) {
+    if (metric === 'macros') { results.macros = { pts: 0, note: 'Tracking only' }; continue; }
+
+    const goal = getGoalForMetric(metric, c, dateStr);
+
+    if (metric === 'workout') {
+      const done = document.getElementById('log_workout_done')?.value === 'yes';
+      if (!done) { results.workout = { pts: 0, note: 'No workout logged' }; continue; }
+
+      let pts;
+      if (mode === 'classic') {
+        pts = c.classicPoints?.workout ?? 2;
+      } else {
+        // Dynamic: pts = 10 / weekly goal
+        const weeklyGoal = goal || 3;
+        pts = Math.round((10 / weeklyGoal) * 100) / 100;
+      }
+      results.workout = { pts, note: `Workout completed (${logState.workoutType || 'type not set'})` };
+      total += pts;
+
+    } else if (metric === 'steps') {
+      const steps = parseInt(document.getElementById('log_steps')?.value) || 0;
+      if (!steps) { results.steps = { pts: 0, note: 'No steps entered' }; continue; }
+
+      // If running sport done today, multiply step goal by 1.5
+      const isRunning  = logState.workoutType === 'running';
+      const effectiveGoal = isRunning ? Math.round(goal * 1.5) : goal;
+      const hit = steps >= (effectiveGoal || 8000);
+
+      let pts = 0;
+      if (hit) {
+        pts = mode === 'classic' ? (c.classicPoints?.steps ?? 1.5) : 1.5;
+      }
+      results.steps = {
+        pts,
+        note: hit
+          ? `${steps.toLocaleString()} steps ✅ (goal: ${(effectiveGoal||8000).toLocaleString()}${isRunning ? ' — running sport modifier' : ''})`
+          : `${steps.toLocaleString()} steps ❌ (goal: ${(effectiveGoal||8000).toLocaleString()})`
+      };
+      total += pts;
+
+    } else if (metric === 'sleep') {
+      const hours = parseFloat(document.getElementById('log_sleep')?.value) || 0;
+      if (!hours) { results.sleep = { pts: 0, note: 'No sleep logged' }; continue; }
+      const hit = hours >= (goal || 8);
+      let pts = 0;
+      if (hit) {
+        pts = mode === 'classic' ? (c.classicPoints?.sleep ?? 1) : 1;
+      }
+      results.sleep = { pts, note: hit ? `${hours}h ✅ (goal: ${goal || 8}h)` : `${hours}h ❌ (goal: ${goal || 8}h)` };
+      total += pts;
+
+    } else if (metric === 'water') {
+      const cups = parseInt(document.getElementById('log_water')?.value) || 0;
+      if (!cups) { results.water = { pts: 0, note: 'No water logged' }; continue; }
+      const hit = cups >= (goal || 10);
+      let pts = 0;
+      if (hit) {
+        pts = mode === 'classic' ? (c.classicPoints?.water ?? 1) : 1;
+      }
+      results.water = { pts, note: hit ? `${cups} cups ✅ (goal: ${goal || 10})` : `${cups} cups ❌ (goal: ${goal || 10})` };
+      total += pts;
+    }
+  }
+
+  return { results, total: Math.round(total * 100) / 100 };
+}
+
+function updatePointsPreview(metrics, challenge, dateStr) {
+  const { results, total } = calcPointsForEntry(metrics, challenge, dateStr);
+  const previewEl = document.getElementById('pointsPreview');
+  const breakdownEl = document.getElementById('pointsBreakdown');
+  const totalEl = document.getElementById('pointsTotal');
+
+  const hasAnyInput = metrics.some(m => {
+    if (m === 'workout') return document.getElementById('log_workout_done')?.value;
+    if (m === 'steps')   return document.getElementById('log_steps')?.value;
+    if (m === 'sleep')   return document.getElementById('log_sleep')?.value;
+    if (m === 'water')   return document.getElementById('log_water')?.value;
+    return false;
+  });
+
+  if (!hasAnyInput) { previewEl.style.display = 'none'; return; }
+  previewEl.style.display = 'block';
+
+  breakdownEl.innerHTML = Object.entries(results).map(([m, r]) => `
+    <div class="points-row">
+      <span class="points-row-label">${METRIC_DEFS[m]?.icon} ${METRIC_DEFS[m]?.label} — ${r.note}</span>
+      <span class="points-row-value">${r.pts > 0 ? '+' + r.pts : '—'}</span>
+    </div>`).join('');
+
+  totalEl.innerHTML = `<span>Total Points</span><span>+${total} pts</span>`;
+}
+
+// ============================================================
+//  SUBMIT LOG ENTRY
+// ============================================================
+async function submitLog(metrics, challenge, dateStr) {
+  if (!currentUser || !challenge) return;
+
+  const { results, total } = calcPointsForEntry(metrics, challenge, dateStr);
+  const submitBtn = document.getElementById('submitLogBtn');
+  submitBtn.textContent = 'Saving...';
+  submitBtn.disabled = true;
+
+  try {
+    const entryData = {
+      challengeId: challenge.id,
+      userId:      currentUser.uid,
+      userName:    currentUser.displayName || currentUser.email,
+      date:        dateStr,
+      points:      total,
+      updatedAt:   serverTimestamp(),
+    };
+
+    // Add each metric's raw data
+    if (metrics.includes('workout')) {
+      entryData.workout = {
+        done: document.getElementById('log_workout_done')?.value || 'no',
+        type: logState.workoutType || null,
+      };
+    }
+    if (metrics.includes('steps'))  entryData.steps  = parseInt(document.getElementById('log_steps')?.value)  || 0;
+    if (metrics.includes('sleep'))  entryData.sleep  = parseFloat(document.getElementById('log_sleep')?.value) || 0;
+    if (metrics.includes('water'))  entryData.water  = parseInt(document.getElementById('log_water')?.value)  || 0;
+    if (metrics.includes('macros')) {
+      entryData.macros = {
+        calories: parseInt(document.getElementById('log_calories')?.value) || 0,
+        protein:  parseInt(document.getElementById('log_protein')?.value)  || 0,
+        carbs:    parseInt(document.getElementById('log_carbs')?.value)    || 0,
+        fat:      parseInt(document.getElementById('log_fat')?.value)      || 0,
+      };
+    }
+
+    // Upsert: use a deterministic doc ID so re-saving replaces the entry
+    const docId = `${challenge.id}_${currentUser.uid}_${dateStr}`;
+    await setDoc(doc(db, 'activityLogs', docId), entryData);
+
+    // Update local cache
+    logState.entries[dateStr] = { id: docId, ...entryData };
+
+    // Success feedback
+    const statusEl = document.getElementById('logDateStatus');
+    statusEl.className = 'log-date-status existing';
+    statusEl.textContent = `✅ Saved! +${total} points`;
+    document.getElementById('existingEntryNote').textContent = '⚠️ This will replace your existing entry for this date';
+
+    // Re-render to reflect saved state
+    setTimeout(() => renderLogForm(), 800);
+
+  } catch (err) {
+    console.error(err);
+    alert('Failed to save entry. Please try again.');
+  } finally {
+    submitBtn.textContent = 'Save Entry ⚡';
+    submitBtn.disabled = false;
+  }
+}
+
+// ============================================================
 //  UTILITIES
 // ============================================================
+function toDateStr(date) {
+  return date.toISOString().split('T')[0];
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');

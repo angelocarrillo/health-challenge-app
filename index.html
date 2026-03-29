@@ -10,17 +10,14 @@
 </head>
 <body>
 
-  <!-- THEME TOGGLE -->
   <button class="theme-toggle" id="themeToggle" title="Toggle theme">
     <span class="theme-icon">☀️</span>
   </button>
 
-  <!-- ===================== LOGIN SCREEN ===================== -->
+  <!-- LOGIN -->
   <div id="loginScreen" class="screen active">
     <div class="login-bg">
-      <div class="orb orb1"></div>
-      <div class="orb orb2"></div>
-      <div class="orb orb3"></div>
+      <div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div>
     </div>
     <div class="login-card">
       <div class="login-logo">
@@ -37,15 +34,11 @@
     </div>
   </div>
 
-  <!-- ===================== MAIN APP ===================== -->
+  <!-- APP -->
   <div id="appScreen" class="screen">
-
-    <!-- NAVBAR -->
     <nav class="navbar">
-      <div class="nav-logo">
-        <span>⚡</span> FitWager
-      </div>
-      <div class="nav-links" id="navLinks">
+      <div class="nav-logo"><span>⚡</span> FitWager</div>
+      <div class="nav-links">
         <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
         <a href="#" class="nav-link" data-page="challenges">Challenges</a>
         <a href="#" class="nav-link" data-page="log">Log Activity</a>
@@ -58,7 +51,7 @@
       </div>
     </nav>
 
-    <!-- ===================== DASHBOARD PAGE ===================== -->
+    <!-- DASHBOARD -->
     <div id="page-dashboard" class="page active">
       <div class="page-header">
         <div>
@@ -66,30 +59,12 @@
           <p class="page-sub">Here's your challenge overview</p>
         </div>
       </div>
-
-      <div class="stats-grid" id="dashboardStats">
-        <div class="stat-card">
-          <div class="stat-icon">🏆</div>
-          <div class="stat-value" id="statActiveChallenges">—</div>
-          <div class="stat-label">Active Challenges</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">⭐</div>
-          <div class="stat-value" id="statTotalPoints">—</div>
-          <div class="stat-label">Total Points</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">🔥</div>
-          <div class="stat-value" id="statCurrentRank">—</div>
-          <div class="stat-label">Current Rank</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">📅</div>
-          <div class="stat-value" id="statDaysLeft">—</div>
-          <div class="stat-label">Days Left</div>
-        </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-value" id="statActiveChallenges">—</div><div class="stat-label">Active Challenges</div></div>
+        <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-value" id="statTotalPoints">—</div><div class="stat-label">Total Points</div></div>
+        <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-value" id="statCurrentRank">—</div><div class="stat-label">Current Rank</div></div>
+        <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value" id="statDaysLeft">—</div><div class="stat-label">Days Left</div></div>
       </div>
-
       <div class="section-title">Your Active Challenges</div>
       <div id="activeChallengesList" class="challenges-list">
         <div class="empty-state">
@@ -100,30 +75,21 @@
       </div>
     </div>
 
-    <!-- ===================== CHALLENGES PAGE ===================== -->
+    <!-- CHALLENGES -->
     <div id="page-challenges" class="page">
       <div class="page-header">
-        <div>
-          <h2 class="page-title">Challenges</h2>
-          <p class="page-sub">Create a new challenge or join one</p>
-        </div>
+        <div><h2 class="page-title">Challenges</h2><p class="page-sub">Create a new challenge or join one</p></div>
         <button class="btn-primary" id="openCreateChallenge">+ New Challenge</button>
       </div>
-
       <div class="tab-bar">
         <button class="tab active" data-tab="my-challenges">My Challenges</button>
         <button class="tab" data-tab="join-challenge">Join via Code</button>
       </div>
-
       <div id="tab-my-challenges" class="tab-content active">
         <div id="myChallengesList" class="challenges-grid">
-          <div class="empty-state">
-            <span>💪</span>
-            <p>No challenges yet. Create your first one!</p>
-          </div>
+          <div class="empty-state"><span>💪</span><p>No challenges yet. Create your first one!</p></div>
         </div>
       </div>
-
       <div id="tab-join-challenge" class="tab-content">
         <div class="join-card">
           <h3>Join a Challenge</h3>
@@ -137,28 +103,67 @@
       </div>
     </div>
 
-    <!-- ===================== LOG ACTIVITY PAGE ===================== -->
+    <!-- LOG ACTIVITY -->
     <div id="page-log" class="page">
       <div class="page-header">
-        <div>
-          <h2 class="page-title">Log Activity</h2>
-          <p class="page-sub">Track today's workout and steps</p>
-        </div>
+        <div><h2 class="page-title">Log Activity</h2><p class="page-sub">Track your daily health metrics</p></div>
       </div>
-      <div class="coming-soon-card">
-        <span>📝</span>
-        <h3>Activity Logging — Coming in Phase 2</h3>
-        <p>Daily workout and step logging will be available once you've joined a challenge.</p>
+
+      <div class="form-group" style="max-width:420px;margin-bottom:28px;">
+        <label>Select Challenge</label>
+        <select id="logChallengeSelect" class="input">
+          <option value="">— Choose a challenge to log for —</option>
+        </select>
+      </div>
+
+      <div id="logFormContainer" style="display:none;">
+
+        <!-- Date bar -->
+        <div class="log-date-bar">
+          <div class="form-group" style="margin:0;">
+            <label>Date</label>
+            <input type="date" id="logDate" class="input" style="max-width:200px;"/>
+          </div>
+          <div id="logDateStatus" class="log-date-status"></div>
+        </div>
+
+        <!-- Baseline prompt for dynamic challenges -->
+        <div id="baselinePrompt" class="baseline-card" style="display:none;">
+          <div class="baseline-header">
+            <span style="font-size:32px;">📊</span>
+            <div>
+              <h4>Set Your Baseline</h4>
+              <p>This is a Dynamic challenge. Enter your averages from last month to personalize your weekly goals.</p>
+            </div>
+          </div>
+          <div id="baselineFields" class="baseline-fields"></div>
+          <button class="btn-primary" id="saveBaselineBtn" style="margin-top:20px;width:100%;">Save Baseline & Start Logging ⚡</button>
+        </div>
+
+        <!-- Daily log form -->
+        <div id="dailyLogForm" style="display:none;">
+          <div id="metricSections" class="metric-sections"></div>
+
+          <div class="points-preview" id="pointsPreview" style="display:none;">
+            <div class="points-preview-title">⭐ Estimated Points for This Entry</div>
+            <div id="pointsBreakdown" class="points-breakdown"></div>
+            <div class="points-total" id="pointsTotal"></div>
+          </div>
+
+          <div class="form-actions" style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
+            <div id="existingEntryNote" style="font-size:12px;color:var(--warn);align-self:center;flex:1;"></div>
+            <button type="button" class="btn-secondary" id="clearLogBtn">Clear</button>
+            <button type="button" class="btn-primary" id="submitLogBtn">Save Entry ⚡</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <!-- ===================== ANALYTICS PAGE ===================== -->
+    <!-- ANALYTICS -->
     <div id="page-analytics" class="page">
       <div class="page-header">
-        <div>
-          <h2 class="page-title">Analytics</h2>
-          <p class="page-sub">Your performance data</p>
-        </div>
+        <div><h2 class="page-title">Analytics</h2><p class="page-sub">Your performance data</p></div>
       </div>
       <div class="coming-soon-card">
         <span>📊</span>
@@ -169,9 +174,9 @@
 
   </div><!-- end appScreen -->
 
-  <!-- ===================== CREATE CHALLENGE MODAL ===================== -->
+  <!-- CREATE CHALLENGE MODAL -->
   <div id="createChallengeModal" class="modal-overlay">
-    <div class="modal">
+    <div class="modal modal-wide">
       <div class="modal-header">
         <h3>Create a New Challenge</h3>
         <button class="modal-close" id="closeCreateChallenge">✕</button>
@@ -205,20 +210,59 @@
             <div class="mode-selector">
               <div class="mode-card active" data-mode="dynamic">
                 <div class="mode-title">⚡ Dynamic</div>
-                <div class="mode-desc">Personalized goals based on each user's baseline. Recommended.</div>
+                <div class="mode-desc">Personalized weekly goals based on each user's baseline. Goals scale up as users improve.</div>
               </div>
               <div class="mode-card" data-mode="classic">
                 <div class="mode-title">📋 Classic</div>
-                <div class="mode-desc">Fixed goals for everyone. 8k steps, 5 workouts/week.</div>
+                <div class="mode-desc">Fixed goals for everyone. Admin sets point values per metric.</div>
               </div>
             </div>
             <input type="hidden" id="challengeMode" value="dynamic"/>
           </div>
 
+          <!-- METRIC SELECTION -->
+          <div class="form-group">
+            <label>Active Metrics <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">(tap to toggle)</span></label>
+            <div class="metric-grid" id="metricSelection">
+              <div class="metric-toggle active" data-metric="workout">
+                <span class="metric-toggle-icon">💪</span>
+                <div class="metric-toggle-label">Workout</div>
+                <div class="metric-toggle-sub">Type + duration</div>
+              </div>
+              <div class="metric-toggle active" data-metric="steps">
+                <span class="metric-toggle-icon">👟</span>
+                <div class="metric-toggle-label">Steps</div>
+                <div class="metric-toggle-sub">Daily step count</div>
+              </div>
+              <div class="metric-toggle" data-metric="sleep">
+                <span class="metric-toggle-icon">😴</span>
+                <div class="metric-toggle-label">Sleep</div>
+                <div class="metric-toggle-sub">Hours per night</div>
+              </div>
+              <div class="metric-toggle" data-metric="water">
+                <span class="metric-toggle-icon">💧</span>
+                <div class="metric-toggle-label">Water</div>
+                <div class="metric-toggle-sub">Cups per day</div>
+              </div>
+              <div class="metric-toggle" data-metric="macros">
+                <span class="metric-toggle-icon">🥗</span>
+                <div class="metric-toggle-label">Macros</div>
+                <div class="metric-toggle-sub">Tracking only</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CLASSIC POINT CONFIG -->
+          <div id="classicPointConfig" class="config-section" style="display:none;">
+            <label class="config-label">Classic Mode — Set Points per Metric</label>
+            <div id="classicPointFields" class="config-grid"></div>
+          </div>
+
+          <!-- PAYOUT -->
           <div class="form-group">
             <label>Payout Structure</label>
             <div class="payout-preview" id="payoutPreview">
-              Enter wager amount to see payout breakdown
+              <span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>
             </div>
           </div>
 
@@ -232,19 +276,17 @@
     </div>
   </div>
 
-  <!-- ===================== CHALLENGE DETAIL MODAL ===================== -->
+  <!-- CHALLENGE DETAIL MODAL -->
   <div id="challengeDetailModal" class="modal-overlay">
     <div class="modal modal-wide">
       <div class="modal-header">
         <h3 id="detailChallengeName">Challenge Details</h3>
         <button class="modal-close" id="closeDetailModal">✕</button>
       </div>
-      <div class="modal-body" id="challengeDetailBody">
-      </div>
+      <div class="modal-body" id="challengeDetailBody"></div>
     </div>
   </div>
 
-  <!-- Firebase SDKs -->
   <script type="module" src="app.js"></script>
 </body>
 </html>
