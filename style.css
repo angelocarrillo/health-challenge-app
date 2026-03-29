@@ -170,6 +170,15 @@ body {
 .btn-secondary { padding:11px 22px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all var(--transition); }
 .btn-secondary:hover { background:var(--bg3); }
 
+.btn-danger {
+  padding:11px 22px;border-radius:var(--radius-sm);border:1px solid var(--danger);
+  background:rgba(255,77,109,0.08);color:var(--danger);
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;transition:all var(--transition);white-space:nowrap;
+}
+.btn-danger:hover { background:var(--danger);color:#fff;transform:translateY(-1px); }
+.btn-danger:disabled { opacity:0.5;cursor:not-allowed;transform:none; }
+
 /* ---- INPUTS ---- */
 .input { width:100%;padding:11px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;transition:all var(--transition);outline:none; }
 .input:focus { border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,0.1); }

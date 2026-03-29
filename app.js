@@ -9,7 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, getDocs, getDoc, doc,
-  updateDoc, setDoc, arrayUnion, query, where, serverTimestamp
+  updateDoc, setDoc, deleteDoc, arrayUnion, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ---- FIREBASE CONFIG ----
@@ -548,13 +548,67 @@ function showChallengeDetail(id, c) {
           <span class="participant-name">${escHtml(pt.name || pt.email)}</span>
           <span class="participant-role">${pt.role === 'admin' ? '👑 Admin' : 'Participant'}</span>
         </div>`).join('')}
-    </div>`;
+    </div>
+
+    ${isAdmin ? `
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">
+        ⚠️ Deleting this challenge will permanently remove it and all activity logs associated with it.
+      </div>
+      <button class="btn-danger" id="deleteChallengeBtn">🗑 Delete Challenge</button>
+    </div>` : ''}`;
+
   detailModal.classList.add('active');
+
+  // Attach delete handler after rendering
+  if (isAdmin) {
+    document.getElementById('deleteChallengeBtn')?.addEventListener('click', () => deleteChallenge(id, c.name));
+  }
 }
 
 window.copyCode = function(code) {
   navigator.clipboard.writeText(code).then(() => alert(`Invite code "${code}" copied!`));
 };
+
+// ============================================================
+//  DELETE CHALLENGE
+// ============================================================
+async function deleteChallenge(challengeId, challengeName) {
+  const confirmed = confirm(
+    `Are you sure you want to delete "${challengeName}"?\n\nThis will permanently delete the challenge and cannot be undone.`
+  );
+  if (!confirmed) return;
+
+  const btn = document.getElementById('deleteChallengeBtn');
+  if (btn) { btn.textContent = 'Deleting...'; btn.disabled = true; }
+
+  try {
+    // Delete all activity logs for this challenge
+    const logsSnap = await getDocs(
+      query(collection(db, 'activityLogs'), where('challengeId', '==', challengeId))
+    );
+    const deleteLogPromises = logsSnap.docs.map(d => deleteDoc(doc(db, 'activityLogs', d.id)));
+    await Promise.all(deleteLogPromises);
+
+    // Delete all baselines for this challenge
+    const basesSnap = await getDocs(collection(db, 'challenges', challengeId, 'baselines'));
+    const deleteBasePromises = basesSnap.docs.map(d => deleteDoc(doc(db, 'challenges', challengeId, 'baselines', d.id)));
+    await Promise.all(deleteBasePromises);
+
+    // Delete the challenge itself
+    await deleteDoc(doc(db, 'challenges', challengeId));
+
+    // Close modal and refresh
+    detailModal.classList.remove('active');
+    await loadMyChallenges();
+    await loadDashboard();
+
+  } catch (err) {
+    console.error('Delete error:', err);
+    alert('Failed to delete challenge. Please try again.');
+    if (btn) { btn.textContent = '🗑 Delete Challenge'; btn.disabled = false; }
+  }
+}
 
 // ============================================================
 //  JOIN CHALLENGE
