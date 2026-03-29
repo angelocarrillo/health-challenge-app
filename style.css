@@ -670,6 +670,72 @@ select.input { cursor:pointer; }
   font-size: 12px; color: var(--text2);
 }
 .breakdown-metric-val { font-weight: 700; color: var(--text); font-family: 'Syne', sans-serif; }
+
+/* ---- Ended badge ---- */
+.badge-ended { background: rgba(139,144,168,0.15); color: var(--text3); }
+.challenge-card-ended { opacity: 0.75; }
+.challenge-card-ended::before { background: linear-gradient(90deg, var(--text3), var(--text2)) !important; }
+
+/* ---- History cards ---- */
+.history-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--card-shadow);
+}
+.history-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  gap: 12px;
+}
+.history-card-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.history-card-dates { font-size: 12px; color: var(--text3); }
+
+.history-my-result {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  background: var(--bg3);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 4px;
+}
+@media(max-width:600px) { .history-my-result { grid-template-columns: repeat(2,1fr); } }
+.history-result-item { text-align: center; }
+.history-result-value {
+  font-family: 'Syne', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.history-result-label { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.history-lb-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  margin-bottom: 4px;
+  transition: background var(--transition);
+}
+.history-lb-row:hover { background: var(--bg3); }
+.history-lb-me { background: rgba(0,229,160,0.06); border: 1px solid rgba(0,229,160,0.2); }
+.history-lb-rank { font-size: 16px; text-align: center; }
+.history-lb-name { font-weight: 500; }
+.history-lb-pts { color: var(--text2); font-size: 12px; text-align: right; }
+.history-lb-payout { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--accent); font-size: 13px; text-align: right; min-width: 40px; }
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

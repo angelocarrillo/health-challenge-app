@@ -387,17 +387,30 @@ async function loadMyChallenges() {
   listEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);">Loading...</div>';
   try {
     const allSnap = await getDocs(collection(db, 'challenges'));
-    const challenges = [];
+    const active = [], ended = [];
     allSnap.forEach(d => {
       const data = d.data();
       const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
-      if (isMember) challenges.push({id: d.id, ...data});
+      if (!isMember) return;
+      if (new Date(data.endDate) < new Date()) ended.push({id: d.id, ...data});
+      else active.push({id: d.id, ...data});
     });
+    const challenges = [...active, ...ended];
     if (challenges.length === 0) {
       listEl.innerHTML = '<div class="empty-state"><span>💪</span><p>No challenges yet. Create your first one!</p></div>';
       return;
     }
-    listEl.innerHTML = challenges.map(c => renderChallengeCard(c)).join('');
+    // Section headers if there are both active and ended
+    let html = '';
+    if (active.length > 0 && ended.length > 0) {
+      html += `<div class="section-title" style="margin-top:0;">Active</div>`;
+      html += active.map(c => renderChallengeCard(c)).join('');
+      html += `<div class="section-title">Past Challenges</div>`;
+      html += ended.map(c => renderChallengeCard(c)).join('');
+    } else {
+      html = challenges.map(c => renderChallengeCard(c)).join('');
+    }
+    listEl.innerHTML = html;
     listEl.querySelectorAll('.challenge-card').forEach(card => {
       card.addEventListener('click', () => {
         const c = challenges.find(x => x.id === card.dataset.id);
@@ -413,16 +426,20 @@ async function loadMyChallenges() {
 function renderChallengeCard(c) {
   const isAdmin   = c.adminId === currentUser?.uid;
   const count     = (c.participants || []).length;
-  const daysLeft  = Math.max(0, Math.ceil((new Date(c.endDate) - new Date()) / 86400000));
+  const now       = new Date();
+  const ended     = new Date(c.endDate) < now;
+  const daysLeft  = Math.max(0, Math.ceil((new Date(c.endDate) - now) / 86400000));
   const modeLabel = c.mode === 'dynamic' ? '⚡ Dynamic' : '📋 Classic';
   const metricIcons = (c.metrics || ['workout','steps']).map(m => METRIC_DEFS[m]?.icon || '').join(' ');
   return `
-    <div class="challenge-card" data-id="${c.id}">
+    <div class="challenge-card ${ended ? 'challenge-card-ended' : ''}" data-id="${c.id}">
       <div class="challenge-card-name">${escHtml(c.name)}</div>
       <div class="challenge-card-meta">
         <span class="badge badge-accent">${modeLabel}</span>
         ${isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span class="badge badge-purple">Participant</span>'}
-        <span class="badge badge-warn">${daysLeft > 0 ? daysLeft + ' days left' : 'Ended'}</span>
+        ${ended
+          ? '<span class="badge badge-ended">✅ Ended</span>'
+          : `<span class="badge badge-warn">${daysLeft} days left</span>`}
       </div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">${formatDate(c.startDate)} → ${formatDate(c.endDate)}</div>
       <div style="font-size:16px;margin-bottom:4px;">${metricIcons}</div>
@@ -1418,15 +1435,35 @@ async function populateAnalyticsSelector() {
   const prev   = select.value;
   select.innerHTML = '<option value="">— Choose a challenge —</option>';
   const allSnap = await getDocs(collection(db, 'challenges'));
+  const now = new Date();
+  const activeOpts = [], endedOpts = [];
   allSnap.forEach(d => {
     const data = d.data();
     const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
-    if (isMember) {
-      const opt = document.createElement('option');
-      opt.value = d.id; opt.textContent = data.name;
-      select.appendChild(opt);
+    if (!isMember) return;
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    if (new Date(data.endDate) < now) {
+      opt.textContent = `${data.name} (Ended)`;
+      endedOpts.push(opt);
+    } else {
+      opt.textContent = data.name;
+      activeOpts.push(opt);
     }
   });
+  // Active first, then ended
+  if (activeOpts.length > 0) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Active';
+    activeOpts.forEach(o => grp.appendChild(o));
+    select.appendChild(grp);
+  }
+  if (endedOpts.length > 0) {
+    const grp = document.createElement('optgroup');
+    grp.label = 'Past Challenges';
+    endedOpts.forEach(o => grp.appendChild(o));
+    select.appendChild(grp);
+  }
   if (prev && [...select.options].some(o => o.value === prev)) {
     select.value = prev;
     document.getElementById('analyticsContainer').style.display = 'block';
@@ -1440,6 +1477,7 @@ async function renderAnalyticsTab(tab, challengeId) {
   if (tab === 'progress')    await renderProgressCharts(challengeId, document.querySelector('#progressToggle .atoggle-btn.active')?.dataset.view || 'me');
   if (tab === 'group')       await renderGroupCharts(challengeId);
   if (tab === 'breakdown')   await renderBreakdown(challengeId, document.querySelector('#breakdownToggle .atoggle-btn.active')?.dataset.view || 'me');
+  if (tab === 'history')     await renderHistory();
 }
 
 // ---- DATA FETCHER ----
@@ -1742,4 +1780,125 @@ async function renderBreakdown(challengeId, view) {
       }
     });
   });
+}
+
+// ============================================================
+//  HISTORY — Past Challenge Stats
+// ============================================================
+async function renderHistory() {
+  const el  = document.getElementById('historyContent');
+  el.innerHTML = '<div style="color:var(--text2);padding:20px;">Loading history...</div>';
+
+  try {
+    const allSnap = await getDocs(collection(db, 'challenges'));
+    const now     = new Date();
+    const past    = [];
+
+    allSnap.forEach(d => {
+      const data = d.data();
+      const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
+      if (isMember && new Date(data.endDate) < now) past.push({ id: d.id, ...data });
+    });
+
+    if (past.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <span>🕘</span>
+          <p>No past challenges yet.<br/>Completed challenges will appear here.</p>
+        </div>`;
+      return;
+    }
+
+    // Sort by most recently ended first
+    past.sort((a, b) => new Date(b.endDate) - new Date(a.endDate));
+
+    // Fetch logs for all past challenges at once
+    const html = await Promise.all(past.map(async (c) => {
+      const logsSnap = await getDocs(
+        query(collection(db, 'activityLogs'), where('challengeId', '==', c.id))
+      );
+      const logs = [];
+      logsSnap.forEach(d => logs.push(d.data()));
+
+      // Aggregate per user
+      const userPoints = {};
+      const userDays   = {};
+      logs.forEach(l => {
+        userPoints[l.userId] = (userPoints[l.userId] || 0) + (l.points || 0);
+        if (!userDays[l.userId]) userDays[l.userId] = new Set();
+        userDays[l.userId].add(l.date);
+      });
+
+      // Rank participants
+      const ranked = (c.participants || [])
+        .map(p => ({
+          ...p,
+          points: Math.round((userPoints[p.uid] || 0) * 100) / 100,
+          days:   (userDays[p.uid] || new Set()).size,
+        }))
+        .sort((a, b) => b.points - a.points || b.days - a.days);
+
+      const me     = ranked.find(p => p.uid === currentUser.uid);
+      const myRank = ranked.indexOf(me) + 1;
+      const splitPct = c.payout?.firstSplitPct ?? 65;
+      const payout   = calcPayout(c.wager, ranked.length, splitPct);
+      const rankEmoji = ['🥇','🥈','🥉'];
+      const totalDays = Math.ceil((new Date(c.endDate) - new Date(c.startDate)) / 86400000);
+      const myPct     = totalDays > 0 ? Math.round((me?.days || 0) / totalDays * 100) : 0;
+
+      return `
+        <div class="history-card">
+          <div class="history-card-header">
+            <div>
+              <div class="history-card-title">${escHtml(c.name)}</div>
+              <div class="history-card-dates">${formatDate(c.startDate)} → ${formatDate(c.endDate)}</div>
+            </div>
+            <span class="badge badge-ended">✅ Ended</span>
+          </div>
+
+          <!-- My result summary -->
+          <div class="history-my-result">
+            <div class="history-result-item">
+              <div class="history-result-value">${rankEmoji[myRank-1] || '#' + myRank}</div>
+              <div class="history-result-label">Final Rank</div>
+            </div>
+            <div class="history-result-item">
+              <div class="history-result-value" style="color:var(--accent);">${me?.points || 0}</div>
+              <div class="history-result-label">Points</div>
+            </div>
+            <div class="history-result-item">
+              <div class="history-result-value">${me?.days || 0}</div>
+              <div class="history-result-label">Days Logged</div>
+            </div>
+            <div class="history-result-item">
+              <div class="history-result-value">${myPct}%</div>
+              <div class="history-result-label">Consistency</div>
+            </div>
+          </div>
+
+          <!-- Final leaderboard -->
+          <div style="margin-top:16px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">Final Standings</div>
+            ${ranked.map((p, i) => {
+              const isMe = p.uid === currentUser.uid;
+              const payoutAmt = i === 0 ? payout.first : i === 1 ? payout.second : i === 2 ? payout.third : null;
+              return `
+                <div class="history-lb-row ${isMe ? 'history-lb-me' : ''}">
+                  <span class="history-lb-rank">${rankEmoji[i] || i+1}</span>
+                  <span class="history-lb-name">${escHtml(getDisplayName(p))}${isMe ? ' <span style="font-size:10px;color:var(--accent);font-weight:700;">YOU</span>' : ''}</span>
+                  <span class="history-lb-pts">${p.points} pts</span>
+                  ${payoutAmt != null ? `<span class="history-lb-payout">$${payoutAmt}</span>` : '<span></span>'}
+                </div>`;
+            }).join('')}
+          </div>
+
+        </div>`;
+    }));
+
+    el.innerHTML = html.join('');
+
+  } catch (err) {
+    console.error(err);
+    el.innerHTML = '<div class="empty-state"><span>⚠️</span><p>Failed to load history.</p></div>';
+  }
 }
