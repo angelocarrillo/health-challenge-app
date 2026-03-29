@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FitWager — Health Challenge</title>
+  <title>Health Challenge</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -22,8 +22,8 @@
     </div>
     <div class="login-card">
       <div class="login-logo">
-        <span class="logo-icon">⚡</span>
-        <h1 class="logo-text">FitWager</h1>
+        <span class="logo-icon">🔒</span>
+        <h1 class="logo-text">Health Challenge</h1>
       </div>
       <p class="login-tagline">Compete. Improve. Win.</p>
       <p class="login-sub">Monthly fitness challenges with your crew — backed by real stakes.</p>
@@ -38,7 +38,7 @@
   <!-- APP -->
   <div id="appScreen" class="screen">
     <nav class="navbar">
-      <div class="nav-logo"><span>⚡</span> FitWager</div>
+      <div class="nav-logo"><span>🔒</span> Health Challenge</div>
       <div class="nav-links">
         <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
         <a href="#" class="nav-link" data-page="challenges">Challenges</a>
@@ -49,6 +49,9 @@
         <img id="userAvatar" class="user-avatar" src="" alt="avatar"/>
         <span id="userName" class="user-name"></span>
         <button class="btn-signout" id="signOutBtn">Sign Out</button>
+        <button class="theme-toggle theme-toggle-nav" id="themeToggleNav" title="Toggle theme">
+          <span class="theme-icon-nav">☀️</span>
+        </button>
       </div>
     </nav>
 
@@ -125,7 +128,7 @@
             </div>
           </div>
           <div id="baselineFields" class="baseline-fields"></div>
-          <button class="btn-primary" id="saveBaselineBtn" style="margin-top:20px;width:100%;">Save Baseline & Start Logging ⚡</button>
+          <button class="btn-primary" id="saveBaselineBtn" style="margin-top:20px;width:100%;">Save Baseline & Start Logging 🔒</button>
         </div>
         <div id="calendarContainer" style="display:none;">
           <div id="activityCalendar"></div>
@@ -242,7 +245,7 @@
           <div style="font-size:11px;color:var(--text3);margin-top:6px;">Max 20 characters</div>
         </div>
         <div class="form-actions">
-          <button class="btn-primary" id="saveNicknameBtn" style="width:100%;">Join Challenge ⚡</button>
+          <button class="btn-primary" id="saveNicknameBtn" style="width:100%;">Join Challenge 🔒</button>
         </div>
       </div>
     </div>
@@ -268,7 +271,7 @@
         <div class="form-actions" style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
           <div id="existingEntryNote" style="font-size:12px;color:var(--warn);align-self:center;flex:1;"></div>
           <button type="button" class="btn-secondary" id="clearLogBtn">Clear</button>
-          <button type="button" class="btn-primary" id="submitLogBtn">Save Entry ⚡</button>
+          <button type="button" class="btn-primary" id="submitLogBtn">Save Entry 🔒</button>
         </div>
       </div>
     </div>
@@ -337,7 +340,7 @@
           </div>
           <div class="form-actions">
             <button type="button" class="btn-secondary" id="cancelCreateChallenge">Cancel</button>
-            <button type="submit" class="btn-primary">Create Challenge ⚡</button>
+            <button type="submit" class="btn-primary">Create Challenge 🔒</button>
           </div>
         </form>
       </div>

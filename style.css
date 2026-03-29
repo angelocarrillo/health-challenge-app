@@ -48,6 +48,19 @@ body {
 }
 .theme-toggle:hover { transform: scale(1.1); }
 
+/* Inline theme toggle inside navbar (mobile only) */
+.theme-toggle-nav {
+  display: none;
+  position: relative;
+  top: auto; right: auto;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+@media (max-width: 768px) {
+  .theme-toggle { display: none; }         /* hide floating toggle */
+  .theme-toggle-nav { display: flex; }     /* show inline one */
+}
+
 /* ---- SCREENS ---- */
 .screen { display: none; min-height: 100vh; }
 .screen.active { display: block; }
@@ -147,15 +160,42 @@ body {
 .mobile-nav-label { text-transform: uppercase; }
 
 @media (max-width: 768px) {
-  /* Hide desktop navbar links, show mobile nav */
+  /* Hide desktop navbar links and logo, show mobile nav */
   .nav-links { display: none; }
+  .nav-logo  { display: none; }
   .mobile-nav { display: block; }
 
-  /* Add bottom padding so content isn't hidden behind nav bar */
-  .page { padding-bottom: 90px; }
+  /* Navbar becomes a slim user bar on mobile */
+  .navbar {
+    padding: 0 16px;
+    height: 54px;
+    justify-content: flex-end;
+    gap: 10px;
+  }
 
-  /* Hide theme toggle on very small screens, move it */
-  .theme-toggle { top: 12px; right: 12px; width: 36px; height: 36px; font-size: 15px; }
+  /* User section — compact, right aligned, no overflow */
+  .nav-user {
+    flex: 1;
+    justify-content: flex-end;
+    min-width: 0;
+    gap: 8px;
+  }
+  .user-name {
+    max-width: 110px;
+    font-size: 12px;
+  }
+  .user-avatar { width: 28px; height: 28px; }
+  .btn-signout { font-size: 11px; padding: 5px 10px; flex-shrink: 0; }
+
+  /* Theme toggle — tuck into top bar area */
+  .theme-toggle {
+    position: relative;
+    top: auto; right: auto;
+    width: 32px; height: 32px;
+    font-size: 14px;
+    flex-shrink: 0;
+    box-shadow: none;
+  }
 
   /* Tighten page padding on mobile */
   .page { padding: 20px 16px 90px; }

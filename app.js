@@ -70,11 +70,17 @@ const themeIcon   = themeToggle.querySelector('.theme-icon');
 
 function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+  const icon = theme === 'dark' ? '☀️' : '🌙';
+  themeIcon.textContent = icon;
+  const navIcon = document.querySelector('.theme-icon-nav');
+  if (navIcon) navIcon.textContent = icon;
   localStorage.setItem('fw-theme', theme);
 }
 setTheme(localStorage.getItem('fw-theme') || 'dark');
 themeToggle.addEventListener('click', () => {
+  setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+document.getElementById('themeToggleNav')?.addEventListener('click', () => {
   setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 });
 
