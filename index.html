@@ -118,15 +118,6 @@
 
       <div id="logFormContainer" style="display:none;">
 
-        <!-- Date bar -->
-        <div class="log-date-bar">
-          <div class="form-group" style="margin:0;">
-            <label>Date</label>
-            <input type="date" id="logDate" class="input" style="max-width:200px;"/>
-          </div>
-          <div id="logDateStatus" class="log-date-status"></div>
-        </div>
-
         <!-- Baseline prompt for dynamic challenges -->
         <div id="baselinePrompt" class="baseline-card" style="display:none;">
           <div class="baseline-header">
@@ -140,25 +131,41 @@
           <button class="btn-primary" id="saveBaselineBtn" style="margin-top:20px;width:100%;">Save Baseline & Start Logging ⚡</button>
         </div>
 
-        <!-- Daily log form -->
-        <div id="dailyLogForm" style="display:none;">
-          <div id="metricSections" class="metric-sections"></div>
-
-          <div class="points-preview" id="pointsPreview" style="display:none;">
-            <div class="points-preview-title">⭐ Estimated Points for This Entry</div>
-            <div id="pointsBreakdown" class="points-breakdown"></div>
-            <div class="points-total" id="pointsTotal"></div>
-          </div>
-
-          <div class="form-actions" style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
-            <div id="existingEntryNote" style="font-size:12px;color:var(--warn);align-self:center;flex:1;"></div>
-            <button type="button" class="btn-secondary" id="clearLogBtn">Clear</button>
-            <button type="button" class="btn-primary" id="submitLogBtn">Save Entry ⚡</button>
-          </div>
+        <!-- Calendar view -->
+        <div id="calendarContainer" style="display:none;">
+          <div id="activityCalendar"></div>
         </div>
 
       </div>
     </div>
+
+  <!-- LOG ENTRY MODAL -->
+  <div id="logEntryModal" class="modal-overlay">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div>
+          <h3 id="logModalTitle">Log Activity</h3>
+          <div id="logModalDate" style="font-size:13px;color:var(--text2);margin-top:2px;"></div>
+        </div>
+        <button class="modal-close" id="closeLogModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="metricSections" class="metric-sections"></div>
+
+        <div class="points-preview" id="pointsPreview" style="display:none;">
+          <div class="points-preview-title">⭐ Estimated Points for This Entry</div>
+          <div id="pointsBreakdown" class="points-breakdown"></div>
+          <div class="points-total" id="pointsTotal"></div>
+        </div>
+
+        <div class="form-actions" style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
+          <div id="existingEntryNote" style="font-size:12px;color:var(--warn);align-self:center;flex:1;"></div>
+          <button type="button" class="btn-secondary" id="clearLogBtn">Clear</button>
+          <button type="button" class="btn-primary" id="submitLogBtn">Save Entry ⚡</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
     <!-- ANALYTICS -->
     <div id="page-analytics" class="page">

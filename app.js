@@ -669,10 +669,11 @@ document.getElementById('joinChallengeBtn').addEventListener('click', async () =
 //  LOG PAGE — STATE
 // ============================================================
 let logState = {
-  challenge: null,     // current challenge object
-  baseline:  null,     // user's baseline for this challenge (dynamic mode)
-  entries:   {},       // { 'YYYY-MM-DD': entryObject }
-  workoutType: null,   // selected workout type for current log
+  challenge:   null,
+  baseline:    null,
+  entries:     {},
+  workoutType: null,
+  activeDate:  null,
 };
 
 // ============================================================
@@ -680,12 +681,9 @@ let logState = {
 // ============================================================
 async function refreshLogPage() {
   if (!currentUser) return;
-
-  // Populate challenge selector with user's active challenges
   const select = document.getElementById('logChallengeSelect');
   const prev   = select.value;
   select.innerHTML = '<option value="">— Choose a challenge to log for —</option>';
-
   try {
     const allSnap = await getDocs(collection(db, 'challenges'));
     const now = new Date();
@@ -699,7 +697,6 @@ async function refreshLogPage() {
         select.appendChild(opt);
       }
     });
-    // Restore previous selection if still valid
     if (prev && [...select.options].some(o => o.value === prev)) {
       select.value = prev;
       await onChallengeSelected(prev);
@@ -720,18 +717,15 @@ async function onChallengeSelected(challengeId) {
   logState.baseline  = null;
   logState.entries   = {};
 
-  // Load challenge data
   const snap = await getDoc(doc(db, 'challenges', challengeId));
   if (!snap.exists()) return;
   logState.challenge = { id: snap.id, ...snap.data() };
 
-  // Load user's baseline (dynamic mode only)
   if (logState.challenge.mode === 'dynamic') {
     const bSnap = await getDoc(doc(db, 'challenges', challengeId, 'baselines', currentUser.uid));
     logState.baseline = bSnap.exists() ? bSnap.data() : null;
   }
 
-  // Load all entries for this user in this challenge
   const eSnap = await getDocs(
     query(collection(db, 'activityLogs'),
       where('challengeId', '==', challengeId),
@@ -739,64 +733,158 @@ async function onChallengeSelected(challengeId) {
   );
   eSnap.forEach(d => { logState.entries[d.data().date] = { id: d.id, ...d.data() }; });
 
-  // Set today's date
-  const todayStr = toDateStr(new Date());
-  document.getElementById('logDate').value = todayStr;
-  document.getElementById('logDate').max = todayStr;
-  document.getElementById('logDate').min = logState.challenge.startDate;
-
-  renderLogForm();
-}
-
-document.getElementById('logDate').addEventListener('change', () => renderLogForm());
-
-// ============================================================
-//  RENDER LOG FORM
-// ============================================================
-function renderLogForm() {
-  const c        = logState.challenge;
-  if (!c) return;
-
-  const dateStr  = document.getElementById('logDate').value;
-  const existing = logState.entries[dateStr] || null;
-  const metrics  = c.metrics || ['workout','steps'];
-
-  // Date status
-  const statusEl = document.getElementById('logDateStatus');
-  if (existing) {
-    statusEl.className = 'log-date-status existing';
-    statusEl.textContent = '✏️ Entry exists — saving will replace it';
-    document.getElementById('existingEntryNote').textContent = '⚠️ This will replace your existing entry for this date';
-  } else {
-    statusEl.className = 'log-date-status new';
-    statusEl.textContent = '✅ No entry yet for this date';
-    document.getElementById('existingEntryNote').textContent = '';
-  }
-
-  // Dynamic mode — check baseline
-  const baselinePrompt = document.getElementById('baselinePrompt');
-  const dailyLogForm   = document.getElementById('dailyLogForm');
+  const c = logState.challenge;
+  const metrics = c.metrics || ['workout','steps'];
+  const baselinePrompt  = document.getElementById('baselinePrompt');
+  const calendarContainer = document.getElementById('calendarContainer');
 
   if (c.mode === 'dynamic' && !logState.baseline) {
-    baselinePrompt.style.display = 'block';
-    dailyLogForm.style.display   = 'none';
+    baselinePrompt.style.display  = 'block';
+    calendarContainer.style.display = 'none';
     renderBaselineFields(metrics);
-    return;
+  } else {
+    baselinePrompt.style.display  = 'none';
+    calendarContainer.style.display = 'block';
+    renderCalendar();
+  }
+}
+
+// ============================================================
+//  CALENDAR RENDERER
+// ============================================================
+function renderCalendar() {
+  const c = logState.challenge;
+  if (!c) return;
+
+  const calEl   = document.getElementById('activityCalendar');
+  const metrics = c.metrics || ['workout','steps'];
+  const start   = new Date(c.startDate + 'T00:00:00');
+  const end     = new Date(c.endDate   + 'T00:00:00');
+  const today   = new Date(); today.setHours(0,0,0,0);
+
+  // Group days by month
+  const months = {};
+  const cur = new Date(start);
+  while (cur <= end) {
+    const key = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+    if (!months[key]) months[key] = { year: cur.getFullYear(), month: cur.getMonth(), days: [] };
+    months[key].days.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
   }
 
-  baselinePrompt.style.display = 'none';
-  dailyLogForm.style.display   = 'block';
+  // Legend
+  const legendHtml = `
+    <div class="cal-legend">
+      ${metrics.map(m => `<div class="cal-legend-item"><span>${METRIC_DEFS[m].icon}</span><span>${METRIC_DEFS[m].label}</span></div>`).join('')}
+      <div class="cal-legend-item" style="margin-left:auto;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text3);opacity:0.4;"></span><span>Not logged</span></div>
+      <div class="cal-legend-item"><span style="color:var(--accent);font-weight:700;">⭐</span><span>Points earned</span></div>
+    </div>`;
 
-  // Render metric sections
+  // Render each month block
+  const monthsHtml = Object.values(months).map(({ year, month, days }) => {
+    const monthName = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const dayHeaders = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+      .map(d => `<div class="cal-day-header">${d}</div>`).join('');
+
+    // Padding cells before first day
+    const firstDow = days[0].getDay();
+    const pads = Array(firstDow).fill('<div class="cal-day empty-cell"></div>').join('');
+
+    const dayCells = days.map(day => {
+      const dateStr   = toDateStr(day);
+      const entry     = logState.entries[dateStr];
+      const isToday   = day.getTime() === today.getTime();
+      const isFuture  = day > today;
+      const inRange   = day >= start && day <= end;
+
+      let cls = 'cal-day';
+      if (isToday)  cls += ' today';
+      if (isFuture) cls += ' future';
+      if (!inRange) cls += ' outside-range';
+
+      let innerHtml = `<div class="cal-day-num">${day.getDate()}</div>`;
+
+      if (entry) {
+        // Build emoji indicators for each logged metric
+        const emojis = metrics.map(m => {
+          if (m === 'workout') return entry.workout?.done === 'yes' ? '💪' : '';
+          if (m === 'steps')   return (entry.steps || 0) > 0 ? '👟' : '';
+          if (m === 'sleep')   return (entry.sleep || 0) > 0 ? '😴' : '';
+          if (m === 'water')   return (entry.water || 0) > 0 ? '💧' : '';
+          if (m === 'macros')  return (entry.macros?.calories || 0) > 0 ? '🥗' : '';
+          return '';
+        }).filter(Boolean).join('');
+
+        innerHtml += `<div class="cal-day-emojis">${emojis}</div>`;
+        if (entry.points > 0) {
+          innerHtml += `<div class="cal-day-points">+${entry.points}pts</div>`;
+        }
+      } else if (!isFuture && inRange) {
+        innerHtml += `<div class="cal-day-dot"></div>`;
+      }
+
+      return `<div class="${cls}" data-date="${dateStr}">${innerHtml}</div>`;
+    }).join('');
+
+    return `
+      <div class="cal-month-block">
+        <div class="cal-month-title">${monthName}</div>
+        <div class="cal-grid">
+          ${dayHeaders}
+          ${pads}
+          ${dayCells}
+        </div>
+      </div>`;
+  }).join('');
+
+  calEl.innerHTML = legendHtml + monthsHtml;
+
+  // Attach click handlers to calendar days
+  calEl.querySelectorAll('.cal-day:not(.future):not(.outside-range):not(.empty-cell)').forEach(cell => {
+    cell.addEventListener('click', () => openLogModal(cell.dataset.date));
+  });
+}
+
+// ============================================================
+//  LOG MODAL — OPEN / CLOSE
+// ============================================================
+const logModal = document.getElementById('logEntryModal');
+document.getElementById('closeLogModal').addEventListener('click', closeLogModal);
+logModal.addEventListener('click', (e) => { if (e.target === logModal) closeLogModal(); });
+
+function openLogModal(dateStr) {
+  const c       = logState.challenge;
+  if (!c) return;
+  const metrics  = c.metrics || ['workout','steps'];
+  const existing = logState.entries[dateStr] || null;
+  logState.activeDate  = dateStr;
+  logState.workoutType = existing?.workout?.type || null;
+
+  // Set modal title and date
+  const d = new Date(dateStr + 'T00:00:00');
+  document.getElementById('logModalTitle').textContent = existing ? '✏️ Edit Entry' : '➕ Log Activity';
+  document.getElementById('logModalDate').textContent  = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+
+  // Existing entry note
+  document.getElementById('existingEntryNote').textContent = existing ? '⚠️ Saving will replace your existing entry for this date' : '';
+
+  // Render metric sections inside modal
   const sectionsEl = document.getElementById('metricSections');
   sectionsEl.innerHTML = metrics.map(m => renderMetricSection(m, c, dateStr, existing)).join('');
+  document.getElementById('pointsPreview').style.display = 'none';
 
-  // Restore existing values if editing
   if (existing) populateExistingEntry(existing, metrics);
 
-  // Attach listeners for live point preview
   attachLogListeners(metrics, c, dateStr);
   updatePointsPreview(metrics, c, dateStr);
+
+  logModal.classList.add('active');
+}
+
+function closeLogModal() {
+  logModal.classList.remove('active');
+  logState.activeDate  = null;
+  logState.workoutType = null;
 }
 
 // ============================================================
@@ -850,9 +938,9 @@ document.getElementById('saveBaselineBtn').addEventListener('click', async () =>
       ...baseline, userId: currentUser.uid, createdAt: serverTimestamp()
     });
     logState.baseline = baseline;
-    document.getElementById('baselinePrompt').style.display = 'none';
-    document.getElementById('dailyLogForm').style.display   = 'block';
-    renderLogForm();
+    document.getElementById('baselinePrompt').style.display   = 'none';
+    document.getElementById('calendarContainer').style.display = 'block';
+    renderCalendar();
   } catch (err) {
     console.error(err); alert('Failed to save baseline. Please try again.');
   }
@@ -1184,14 +1272,9 @@ async function submitLog(metrics, challenge, dateStr) {
     // Update local cache
     logState.entries[dateStr] = { id: docId, ...entryData };
 
-    // Success feedback
-    const statusEl = document.getElementById('logDateStatus');
-    statusEl.className = 'log-date-status existing';
-    statusEl.textContent = `✅ Saved! +${total} points`;
-    document.getElementById('existingEntryNote').textContent = '⚠️ This will replace your existing entry for this date';
-
-    // Re-render to reflect saved state
-    setTimeout(() => renderLogForm(), 800);
+    // Close modal and refresh calendar
+    closeLogModal();
+    renderCalendar();
 
   } catch (err) {
     console.error(err);
