@@ -160,9 +160,10 @@ body {
 .mobile-nav-label { text-transform: uppercase; }
 
 @media (max-width: 768px) {
-  /* Hide desktop navbar links and logo, show mobile nav */
+  /* Hide desktop navbar links and logo text, show mobile nav */
   .nav-links { display: none; }
-  .nav-logo  { display: none; }
+  .nav-logo  { font-size: 24px; }
+  .nav-logo .nav-logo-text { display: none; }
   .mobile-nav { display: block; }
 
   /* Navbar becomes a slim user bar on mobile */
