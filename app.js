@@ -89,11 +89,18 @@ function showScreen(id) {
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav-item').forEach(l => l.classList.remove('active'));
   document.getElementById(`page-${name}`)?.classList.add('active');
   document.querySelector(`.nav-link[data-page="${name}"]`)?.classList.add('active');
+  document.querySelector(`.mobile-nav-item[data-page="${name}"]`)?.classList.add('active');
   if (name === 'log')       refreshLogPage();
   if (name === 'analytics') populateAnalyticsSelector();
 }
+
+// Wire up mobile nav buttons
+document.querySelectorAll('.mobile-nav-item').forEach(btn => {
+  btn.addEventListener('click', () => showPage(btn.dataset.page));
+});
 window.showPage = showPage;
 
 // ============================================================

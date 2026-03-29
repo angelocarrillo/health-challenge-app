@@ -104,6 +104,110 @@ body {
 .btn-signout { padding:6px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;transition:all var(--transition); }
 .btn-signout:hover { color:var(--danger);border-color:var(--danger); }
 
+/* ---- MOBILE BOTTOM TAB BAR ---- */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  background: var(--nav-bg);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+}
+.mobile-nav-inner {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  text-decoration: none;
+  color: var(--text3);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: color var(--transition);
+  font-family: 'DM Sans', sans-serif;
+}
+.mobile-nav-item:hover,
+.mobile-nav-item.active { color: var(--accent); }
+.mobile-nav-icon {
+  font-size: 22px;
+  line-height: 1;
+  transition: transform var(--transition);
+}
+.mobile-nav-item.active .mobile-nav-icon { transform: translateY(-2px); }
+.mobile-nav-label { text-transform: uppercase; }
+
+@media (max-width: 768px) {
+  /* Hide desktop navbar links, show mobile nav */
+  .nav-links { display: none; }
+  .mobile-nav { display: block; }
+
+  /* Add bottom padding so content isn't hidden behind nav bar */
+  .page { padding-bottom: 90px; }
+
+  /* Hide theme toggle on very small screens, move it */
+  .theme-toggle { top: 12px; right: 12px; width: 36px; height: 36px; font-size: 15px; }
+
+  /* Tighten page padding on mobile */
+  .page { padding: 20px 16px 90px; }
+
+  /* Stack page header on mobile */
+  .page-header { flex-direction: column; align-items: flex-start; }
+
+  /* Stats grid 2 columns on mobile */
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* Challenges grid single column */
+  .challenges-grid { grid-template-columns: 1fr; }
+
+  /* Calendar cells smaller on mobile */
+  .cal-day { min-height: 54px; padding: 5px 3px 4px; }
+  .cal-day-emojis { font-size: 11px; }
+  .cal-day-num { font-size: 11px; }
+  .cal-day-points { font-size: 9px; }
+
+  /* Modal full width on mobile */
+  .modal { max-width: 100%; border-radius: 20px 20px 0 0; }
+  .modal-overlay { align-items: flex-end; padding: 0; }
+
+  /* Leaderboard grid on mobile */
+  .leaderboard-header,
+  .leaderboard-row { grid-template-columns: 36px 1fr 60px 60px; }
+  .leaderboard-header > div:nth-child(3),
+  .leaderboard-row > div:nth-child(3) { display: none; }
+
+  /* History result grid */
+  .history-my-result { grid-template-columns: repeat(2, 1fr); }
+
+  /* Breakdown grid */
+  .breakdown-grid { grid-template-columns: 1fr; }
+
+  /* Form row stack on mobile */
+  .form-row { grid-template-columns: 1fr; }
+
+  /* Mode selector stack */
+  .mode-selector { grid-template-columns: 1fr; }
+
+  /* Metric grid fewer columns */
+  .metric-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* Workout type selector */
+  .workout-type-selector { grid-template-columns: 1fr; }
+
+  /* Prevent horizontal scroll */
+  body { overflow-x: hidden; }
+  #appScreen { overflow-x: hidden; }
+}
+
 /* ---- PAGES ---- */
 .page { display:none;padding:40px;max-width:1100px;margin:0 auto; }
 .page.active { display:block;animation:fadeUp 0.4s ease both; }
