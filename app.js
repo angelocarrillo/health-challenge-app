@@ -583,20 +583,32 @@ async function deleteChallenge(challengeId, challengeName) {
   if (btn) { btn.textContent = 'Deleting...'; btn.disabled = true; }
 
   try {
-    // Delete all activity logs for this challenge
+    // Step 1: Delete activity logs
+    console.log('Step 1: Deleting activity logs for', challengeId);
     const logsSnap = await getDocs(
       query(collection(db, 'activityLogs'), where('challengeId', '==', challengeId))
     );
-    const deleteLogPromises = logsSnap.docs.map(d => deleteDoc(doc(db, 'activityLogs', d.id)));
-    await Promise.all(deleteLogPromises);
+    console.log('Found', logsSnap.docs.length, 'activity logs to delete');
+    for (const d of logsSnap.docs) {
+      console.log('Deleting log:', d.id, 'userId:', d.data().userId);
+      await deleteDoc(doc(db, 'activityLogs', d.id));
+      console.log('Log deleted:', d.id);
+    }
 
-    // Delete all baselines for this challenge
+    // Step 2: Delete baselines
+    console.log('Step 2: Deleting baselines');
     const basesSnap = await getDocs(collection(db, 'challenges', challengeId, 'baselines'));
-    const deleteBasePromises = basesSnap.docs.map(d => deleteDoc(doc(db, 'challenges', challengeId, 'baselines', d.id)));
-    await Promise.all(deleteBasePromises);
+    console.log('Found', basesSnap.docs.length, 'baselines to delete');
+    for (const d of basesSnap.docs) {
+      console.log('Deleting baseline:', d.id);
+      await deleteDoc(doc(db, 'challenges', challengeId, 'baselines', d.id));
+      console.log('Baseline deleted:', d.id);
+    }
 
-    // Delete the challenge itself
+    // Step 3: Delete the challenge itself
+    console.log('Step 3: Deleting challenge doc', challengeId);
     await deleteDoc(doc(db, 'challenges', challengeId));
+    console.log('Challenge deleted successfully');
 
     // Close modal and refresh
     detailModal.classList.remove('active');
@@ -604,8 +616,8 @@ async function deleteChallenge(challengeId, challengeName) {
     await loadDashboard();
 
   } catch (err) {
-    console.error('Delete error:', err);
-    alert('Failed to delete challenge. Please try again.');
+    console.error('Delete error at step:', err.message, err);
+    alert(`Failed to delete: ${err.message}`);
     if (btn) { btn.textContent = '🗑 Delete Challenge'; btn.disabled = false; }
   }
 }
