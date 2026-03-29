@@ -91,7 +91,8 @@ function showPage(name) {
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   document.getElementById(`page-${name}`)?.classList.add('active');
   document.querySelector(`.nav-link[data-page="${name}"]`)?.classList.add('active');
-  if (name === 'log') refreshLogPage();
+  if (name === 'log')       refreshLogPage();
+  if (name === 'analytics') populateAnalyticsSelector();
 }
 window.showPage = showPage;
 
@@ -456,9 +457,25 @@ async function loadDashboard() {
       }
     });
 
+    // Tally total points across all active challenges
+    let totalPts = 0;
+    let bestRank = Infinity;
+    for (const c of activeChallenges) {
+      const logsSnap = await getDocs(query(collection(db, 'activityLogs'), where('challengeId', '==', c.id)));
+      const allLogs = [];
+      logsSnap.forEach(d => allLogs.push(d.data()));
+      const myPts = allLogs.filter(l => l.userId === currentUser.uid).reduce((s,l) => s+(l.points||0), 0);
+      totalPts += myPts;
+      // Compute rank in this challenge
+      const userTotals = {};
+      allLogs.forEach(l => { userTotals[l.userId] = (userTotals[l.userId]||0) + (l.points||0); });
+      const sorted = Object.values(userTotals).sort((a,b) => b-a);
+      const rank   = sorted.indexOf(myPts) + 1 || (c.participants||[]).length;
+      if (rank < bestRank) bestRank = rank;
+    }
     document.getElementById('statActiveChallenges').textContent = active;
-    document.getElementById('statTotalPoints').textContent = '—';
-    document.getElementById('statCurrentRank').textContent = '—';
+    document.getElementById('statTotalPoints').textContent = Math.round(totalPts * 10) / 10;
+    document.getElementById('statCurrentRank').textContent = bestRank === Infinity ? '—' : `#${bestRank}`;
     document.getElementById('statDaysLeft').textContent = minDays === Infinity ? '—' : minDays;
 
     const listEl = document.getElementById('activeChallengesList');
@@ -625,6 +642,9 @@ async function deleteChallenge(challengeId, challengeName) {
 // ============================================================
 //  JOIN CHALLENGE
 // ============================================================
+// Pending join state (waiting for nickname)
+let pendingJoin = { challengeId: null, challengeName: null };
+
 document.getElementById('joinChallengeBtn').addEventListener('click', async () => {
   const code  = document.getElementById('inviteCodeInput').value.trim().toUpperCase();
   const msgEl = document.getElementById('joinMessage');
@@ -646,22 +666,58 @@ document.getElementById('joinChallengeBtn').addEventListener('click', async () =
       msgEl.className = 'join-message error';
       msgEl.textContent = '✅ You\'re already in this challenge!'; return;
     }
-    await updateDoc(doc(db, 'challenges', docSnap.id), {
-      participants: arrayUnion({
-        uid: currentUser.uid, name: currentUser.displayName || currentUser.email,
-        email: currentUser.email, photo: currentUser.photoURL || '',
-        role: 'participant', joinedAt: new Date().toISOString()
-      })
-    });
-    msgEl.className = 'join-message success';
-    msgEl.textContent = `🎉 You've joined "${challenge.name}"!`;
-    document.getElementById('inviteCodeInput').value = '';
-    await loadMyChallenges();
-    await loadDashboard();
+    // Store pending join and open nickname modal
+    pendingJoin = { challengeId: docSnap.id, challengeName: challenge.name };
+    msgEl.className = 'join-message';
+    msgEl.textContent = '';
+    // Pre-fill nickname with first name
+    document.getElementById('nicknameInput').value = (currentUser.displayName || '').split(' ')[0];
+    document.getElementById('nicknameModal').classList.add('active');
   } catch (err) {
     console.error(err);
     msgEl.className = 'join-message error';
     msgEl.textContent = '❌ Something went wrong. Please try again.';
+  }
+});
+
+// ============================================================
+//  NICKNAME MODAL
+// ============================================================
+const nicknameModal = document.getElementById('nicknameModal');
+
+document.getElementById('saveNicknameBtn').addEventListener('click', async () => {
+  const nickname = document.getElementById('nicknameInput').value.trim();
+  if (!nickname) { alert('Please enter a nickname.'); return; }
+  if (!pendingJoin.challengeId) return;
+
+  const btn = document.getElementById('saveNicknameBtn');
+  btn.textContent = 'Joining...'; btn.disabled = true;
+
+  try {
+    await updateDoc(doc(db, 'challenges', pendingJoin.challengeId), {
+      participants: arrayUnion({
+        uid:      currentUser.uid,
+        name:     currentUser.displayName || currentUser.email,
+        nickname: nickname,
+        email:    currentUser.email,
+        photo:    currentUser.photoURL || '',
+        role:     'participant',
+        joinedAt: new Date().toISOString()
+      })
+    });
+    nicknameModal.classList.remove('active');
+    const msgEl = document.getElementById('joinMessage');
+    msgEl.className = 'join-message success';
+    msgEl.textContent = `🎉 You've joined "${pendingJoin.challengeName}" as "${nickname}"!`;
+    document.getElementById('inviteCodeInput').value = '';
+    pendingJoin = { challengeId: null, challengeName: null };
+    await loadMyChallenges();
+    await loadDashboard();
+  } catch (err) {
+    console.error(err);
+    alert('Failed to join. Please try again.');
+  } finally {
+    btn.textContent = 'Join Challenge ⚡'; btn.disabled = false;
   }
 });
 
@@ -1302,4 +1358,388 @@ function escHtml(str) {
   const div = document.createElement('div');
   div.appendChild(document.createTextNode(str || ''));
   return div.innerHTML;
+}
+
+// ============================================================
+//  ANALYTICS — Phase 3
+// ============================================================
+
+// Chart instances (tracked so we can destroy before re-render)
+const chartInstances = {};
+
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+// Analytics tab switching
+document.querySelectorAll('[data-atab]').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('[data-atab]').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.atab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(`atab-${tab.dataset.atab}`)?.classList.add('active');
+    const cid = document.getElementById('analyticsChallengeSelect').value;
+    if (cid) renderAnalyticsTab(tab.dataset.atab, cid);
+  });
+});
+
+// Progress toggle (me vs all)
+document.querySelectorAll('#progressToggle .atoggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#progressToggle .atoggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cid = document.getElementById('analyticsChallengeSelect').value;
+    if (cid) renderProgressCharts(cid, btn.dataset.view);
+  });
+});
+
+// Breakdown toggle
+document.querySelectorAll('#breakdownToggle .atoggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#breakdownToggle .atoggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cid = document.getElementById('analyticsChallengeSelect').value;
+    if (cid) renderBreakdown(cid, btn.dataset.view);
+  });
+});
+
+// Challenge selector
+document.getElementById('analyticsChallengeSelect').addEventListener('change', async (e) => {
+  const cid = e.target.value;
+  const container = document.getElementById('analyticsContainer');
+  if (!cid) { container.style.display = 'none'; return; }
+  container.style.display = 'block';
+  const activeTab = document.querySelector('[data-atab].active')?.dataset.atab || 'leaderboard';
+  await renderAnalyticsTab(activeTab, cid);
+});
+
+async function populateAnalyticsSelector() {
+  const select = document.getElementById('analyticsChallengeSelect');
+  const prev   = select.value;
+  select.innerHTML = '<option value="">— Choose a challenge —</option>';
+  const allSnap = await getDocs(collection(db, 'challenges'));
+  allSnap.forEach(d => {
+    const data = d.data();
+    const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
+    if (isMember) {
+      const opt = document.createElement('option');
+      opt.value = d.id; opt.textContent = data.name;
+      select.appendChild(opt);
+    }
+  });
+  if (prev && [...select.options].some(o => o.value === prev)) {
+    select.value = prev;
+    document.getElementById('analyticsContainer').style.display = 'block';
+    const activeTab = document.querySelector('[data-atab].active')?.dataset.atab || 'leaderboard';
+    await renderAnalyticsTab(activeTab, prev);
+  }
+}
+
+async function renderAnalyticsTab(tab, challengeId) {
+  if (tab === 'leaderboard') await renderLeaderboard(challengeId);
+  if (tab === 'progress')    await renderProgressCharts(challengeId, document.querySelector('#progressToggle .atoggle-btn.active')?.dataset.view || 'me');
+  if (tab === 'group')       await renderGroupCharts(challengeId);
+  if (tab === 'breakdown')   await renderBreakdown(challengeId, document.querySelector('#breakdownToggle .atoggle-btn.active')?.dataset.view || 'me');
+}
+
+// ---- DATA FETCHER ----
+async function fetchChallengeData(challengeId) {
+  const cSnap = await getDoc(doc(db, 'challenges', challengeId));
+  if (!cSnap.exists()) return null;
+  const challenge = { id: cSnap.id, ...cSnap.data() };
+
+  const logsSnap = await getDocs(
+    query(collection(db, 'activityLogs'), where('challengeId', '==', challengeId))
+  );
+  const logs = [];
+  logsSnap.forEach(d => logs.push({ id: d.id, ...d.data() }));
+  return { challenge, logs };
+}
+
+// ---- HELPERS ----
+function getWeekLabel(dateStr, startDate) {
+  const start = new Date(startDate + 'T00:00:00');
+  const date  = new Date(dateStr  + 'T00:00:00');
+  const diff  = Math.floor((date - start) / (7 * 86400000));
+  return `Week ${diff + 1}`;
+}
+
+function getDisplayName(participant) {
+  return participant.nickname || participant.name?.split(' ')[0] || 'Unknown';
+}
+
+function calcStreak(logs, userId) {
+  const userLogs = logs.filter(l => l.userId === userId);
+  const dates = [...new Set(userLogs.map(l => l.date))].sort().reverse();
+  if (dates.length === 0) return 0;
+  let streak = 0;
+  const today = toDateStr(new Date());
+  let check   = today;
+  for (const d of dates) {
+    if (d === check) { streak++; const dt = new Date(check + 'T00:00:00'); dt.setDate(dt.getDate()-1); check = toDateStr(dt); }
+    else break;
+  }
+  return streak;
+}
+
+// Color palette for charts
+const CHART_COLORS = ['#00e5a0','#7c6dfa','#ffb347','#ff4d6d','#38bdf8','#a78bfa','#34d399','#f472b6'];
+
+// ---- LEADERBOARD ----
+async function renderLeaderboard(challengeId) {
+  const data = await fetchChallengeData(challengeId);
+  if (!data) return;
+  const { challenge, logs } = data;
+  const el = document.getElementById('leaderboardContent');
+
+  // Aggregate points per user
+  const userPoints = {};
+  const userDays   = {};
+  logs.forEach(l => {
+    if (!userPoints[l.userId]) { userPoints[l.userId] = 0; userDays[l.userId] = new Set(); }
+    userPoints[l.userId] += l.points || 0;
+    userDays[l.userId].add(l.date);
+  });
+
+  // Build ranked list from participants
+  const ranked = (challenge.participants || []).map(p => ({
+    ...p,
+    points: Math.round((userPoints[p.uid] || 0) * 100) / 100,
+    days:   (userDays[p.uid] || new Set()).size,
+    streak: calcStreak(logs, p.uid),
+  })).sort((a, b) => b.points - a.points || b.days - a.days);
+
+  const rankEmoji = ['🥇','🥈','🥉'];
+  const p = calcPayout(challenge.wager, ranked.length, challenge.payout?.firstSplitPct ?? 65);
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;">${challenge.name}</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;">${ranked.length} participants · $${p.total} pot</div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 18px;">
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#FFD700;">$${p.first}</div>
+          <div style="font-size:11px;color:var(--text3);">🥇 1st Place</div>
+        </div>
+        <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 18px;">
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#C0C0C0;">$${p.second}</div>
+          <div style="font-size:11px;color:var(--text3);">🥈 2nd Place</div>
+        </div>
+        <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 18px;">
+          <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#CD7F32;">$${p.third}</div>
+          <div style="font-size:11px;color:var(--text3);">🥉 3rd Place</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="leaderboard-header">
+      <div>Rank</div><div>Participant</div><div style="text-align:right;">Streak</div>
+      <div style="text-align:right;">Days</div><div style="text-align:right;">Points</div>
+    </div>
+
+    ${ranked.map((p, i) => {
+      const isMe = p.uid === currentUser.uid;
+      const rankCls = i < 3 ? `rank-${i+1}` : '';
+      const avatarHtml = p.photo
+        ? `<img src="${p.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'">`
+        : `<div class="lb-avatar">${(getDisplayName(p))[0].toUpperCase()}</div>`;
+      return `
+        <div class="leaderboard-row ${rankCls} ${isMe ? 'is-me' : ''}">
+          <div class="lb-rank">${rankEmoji[i] || i+1}</div>
+          <div class="lb-user">
+            ${avatarHtml}
+            <div>
+              <div class="lb-name">${escHtml(getDisplayName(p))}${isMe ? '<span class="lb-you">YOU</span>' : ''}</div>
+            </div>
+          </div>
+          <div class="lb-streak" style="text-align:right;">${p.streak > 0 ? `<span class="streak-badge">🔥 ${p.streak}</span>` : '—'}</div>
+          <div class="lb-days" style="text-align:right;">${p.days} days</div>
+          <div class="lb-pts">${p.points}</div>
+        </div>`;
+    }).join('')}`;
+}
+
+// ---- PROGRESS CHARTS ----
+async function renderProgressCharts(challengeId, view) {
+  const data = await fetchChallengeData(challengeId);
+  if (!data) return;
+  const { challenge, logs } = data;
+
+  const start    = challenge.startDate;
+  const allDates = [...new Set(logs.map(l => l.date))].sort();
+  const weeks    = [...new Set(allDates.map(d => getWeekLabel(d, start)))];
+
+  destroyChart('weeklyBar');
+  destroyChart('cumulativeLine');
+
+  const ctxBar  = document.getElementById('weeklyBarChart').getContext('2d');
+  const ctxLine = document.getElementById('cumulativeLineChart').getContext('2d');
+  const isDark  = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textColor = isDark ? '#8b90a8' : '#5a6070';
+
+  const chartDefaults = {
+    responsive: true,
+    plugins: { legend: { labels: { color: textColor, font: { family: 'DM Sans' } } } },
+    scales: {
+      x: { grid: { color: gridColor }, ticks: { color: textColor } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor }, beginAtZero: true }
+    }
+  };
+
+  if (view === 'me') {
+    const myLogs = logs.filter(l => l.userId === currentUser.uid);
+    const weeklyPts = weeks.map(w => myLogs.filter(l => getWeekLabel(l.date, start) === w).reduce((s, l) => s + (l.points||0), 0));
+    const cumulative = weeklyPts.reduce((acc, v, i) => { acc.push((acc[i-1] || 0) + v); return acc; }, []);
+
+    chartInstances.weeklyBar = new Chart(ctxBar, {
+      type: 'bar',
+      data: { labels: weeks, datasets: [{ label: 'My Points', data: weeklyPts, backgroundColor: '#00e5a0', borderRadius: 6 }] },
+      options: chartDefaults
+    });
+    chartInstances.cumulativeLine = new Chart(ctxLine, {
+      type: 'line',
+      data: { labels: weeks, datasets: [{ label: 'My Cumulative Points', data: cumulative, borderColor: '#00e5a0', backgroundColor: 'rgba(0,229,160,0.1)', tension: 0.4, fill: true, pointBackgroundColor: '#00e5a0' }] },
+      options: chartDefaults
+    });
+  } else {
+    // All participants
+    const participants = challenge.participants || [];
+    const barDatasets = participants.map((p, i) => ({
+      label: getDisplayName(p),
+      data: weeks.map(w => logs.filter(l => l.userId === p.uid && getWeekLabel(l.date, start) === w).reduce((s, l) => s + (l.points||0), 0)),
+      backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+      borderRadius: 4,
+    }));
+    const lineDatasets = participants.map((p, i) => {
+      const weeklyP = weeks.map(w => logs.filter(l => l.userId === p.uid && getWeekLabel(l.date, start) === w).reduce((s, l) => s + (l.points||0), 0));
+      const cum = weeklyP.reduce((acc, v, j) => { acc.push((acc[j-1] || 0) + v); return acc; }, []);
+      return { label: getDisplayName(p), data: cum, borderColor: CHART_COLORS[i % CHART_COLORS.length], backgroundColor: 'transparent', tension: 0.4, pointBackgroundColor: CHART_COLORS[i % CHART_COLORS.length] };
+    });
+    chartInstances.weeklyBar = new Chart(ctxBar, {
+      type: 'bar',
+      data: { labels: weeks, datasets: barDatasets },
+      options: { ...chartDefaults, plugins: { ...chartDefaults.plugins } }
+    });
+    chartInstances.cumulativeLine = new Chart(ctxLine, {
+      type: 'line',
+      data: { labels: weeks, datasets: lineDatasets },
+      options: chartDefaults
+    });
+  }
+}
+
+// ---- GROUP CHARTS ----
+async function renderGroupCharts(challengeId) {
+  const data = await fetchChallengeData(challengeId);
+  if (!data) return;
+  const { challenge, logs } = data;
+  const start = challenge.startDate;
+  const weeks = [...new Set(logs.map(l => getWeekLabel(l.date, start)))].sort((a,b) => parseInt(a.split(' ')[1]) - parseInt(b.split(' ')[1]));
+
+  destroyChart('groupBar');
+  destroyChart('groupLine');
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textColor = isDark ? '#8b90a8' : '#5a6070';
+  const chartDefaults = {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: { color: gridColor }, ticks: { color: textColor } }, y: { grid: { color: gridColor }, ticks: { color: textColor }, beginAtZero: true } }
+  };
+
+  const groupWeekly = weeks.map(w => logs.filter(l => getWeekLabel(l.date, start) === w).reduce((s, l) => s + (l.points||0), 0));
+  const groupCum    = groupWeekly.reduce((acc, v, i) => { acc.push((acc[i-1] || 0) + v); return acc; }, []);
+
+  chartInstances.groupBar = new Chart(document.getElementById('groupBarChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: weeks, datasets: [{ label: 'Group Points', data: groupWeekly, backgroundColor: '#7c6dfa', borderRadius: 6 }] },
+    options: chartDefaults
+  });
+  chartInstances.groupLine = new Chart(document.getElementById('groupLineChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: weeks, datasets: [{ label: 'Group Cumulative', data: groupCum, borderColor: '#7c6dfa', backgroundColor: 'rgba(124,109,250,0.1)', tension: 0.4, fill: true, pointBackgroundColor: '#7c6dfa' }] },
+    options: chartDefaults
+  });
+}
+
+// ---- BREAKDOWN ----
+async function renderBreakdown(challengeId, view) {
+  const data = await fetchChallengeData(challengeId);
+  if (!data) return;
+  const { challenge, logs } = data;
+  const metrics = challenge.metrics || ['workout','steps'];
+  const el = document.getElementById('breakdownContent');
+
+  // Destroy old breakdown charts
+  Object.keys(chartInstances).filter(k => k.startsWith('donut_')).forEach(k => destroyChart(k));
+
+  const participants = view === 'me'
+    ? (challenge.participants || []).filter(p => p.uid === currentUser.uid)
+    : (challenge.participants || []);
+
+  el.innerHTML = `<div class="breakdown-grid" id="breakdownGrid"></div>`;
+  const grid = document.getElementById('breakdownGrid');
+
+  participants.forEach((p, idx) => {
+    const userLogs = logs.filter(l => l.userId === p.uid);
+    const metricCounts = {};
+    const metricPoints = {};
+
+    metrics.forEach(m => { metricCounts[m] = 0; metricPoints[m] = 0; });
+    userLogs.forEach(l => {
+      if (metrics.includes('workout') && l.workout?.done === 'yes') metricCounts.workout++;
+      if (metrics.includes('steps')   && (l.steps || 0) > 0)       metricCounts.steps++;
+      if (metrics.includes('sleep')   && (l.sleep || 0) > 0)       metricCounts.sleep++;
+      if (metrics.includes('water')   && (l.water || 0) > 0)       metricCounts.water++;
+      if (metrics.includes('macros')  && (l.macros?.calories || 0) > 0) metricCounts.macros++;
+    });
+
+    const canvasId = `donut_${p.uid.slice(0,8)}`;
+    const card = document.createElement('div');
+    card.className = 'breakdown-card';
+    const avatarHtml = p.photo
+      ? `<img src="${p.photo}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">`
+      : `<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;">${getDisplayName(p)[0].toUpperCase()}</div>`;
+    card.innerHTML = `
+      <div class="breakdown-card-name">${avatarHtml}${escHtml(getDisplayName(p))}${p.uid === currentUser.uid ? ' <span style="font-size:10px;color:var(--accent);">YOU</span>' : ''}</div>
+      <div class="breakdown-chart-wrap"><canvas id="${canvasId}"></canvas></div>
+      <div class="breakdown-metric-list">
+        ${metrics.map(m => `
+          <div class="breakdown-metric-row">
+            <span>${METRIC_DEFS[m].icon} ${METRIC_DEFS[m].label}</span>
+            <span class="breakdown-metric-val">${metricCounts[m]} days</span>
+          </div>`).join('')}
+      </div>`;
+    grid.appendChild(card);
+
+    // Render donut chart
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#8b90a8' : '#5a6070';
+    const chartData = metrics.map(m => metricCounts[m]);
+    const hasData   = chartData.some(v => v > 0);
+
+    chartInstances[canvasId] = new Chart(document.getElementById(canvasId).getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: metrics.map(m => METRIC_DEFS[m].label),
+        datasets: [{
+          data: hasData ? chartData : metrics.map(() => 1),
+          backgroundColor: hasData ? metrics.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]) : ['rgba(255,255,255,0.05)'],
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'right', labels: { color: textColor, font: { family: 'DM Sans', size: 11 }, boxWidth: 12, padding: 8 } },
+          tooltip: { enabled: hasData }
+        },
+        cutout: '65%'
+      }
+    });
+  });
 }
