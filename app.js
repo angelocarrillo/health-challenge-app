@@ -891,23 +891,28 @@ function renderCalendar() {
       let innerHtml = `<div class="cal-day-num">${day.getDate()}</div>`;
 
       if (entry) {
-        // Desktop: show emojis per metric + points
-        const emojis = metrics.map(m => {
-          if (m === 'workout') return entry.workout?.done === 'yes' ? '💪' : '';
-          if (m === 'steps')   return (entry.steps || 0) > 0 ? '👟' : '';
-          if (m === 'sleep')   return (entry.sleep || 0) > 0 ? '😴' : '';
-          if (m === 'water')   return (entry.water || 0) > 0 ? '💧' : '';
-          if (m === 'macros')  return (entry.macros?.calories || 0) > 0 ? '🥗' : '';
-          return '';
-        }).filter(Boolean).join('');
-
-        // Desktop: emojis + points label
-        innerHtml += `<div class="cal-day-emojis cal-desktop-only">${emojis}</div>`;
-        if (entry.points > 0) {
-          innerHtml += `<div class="cal-day-points">${entry.points}pts</div>`;
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+          // Mobile: green dot + points only — no emojis to avoid layout warping
+          innerHtml += `<div class="cal-logged-dot"></div>`;
+          if (entry.points > 0) {
+            innerHtml += `<div class="cal-day-points">${entry.points}pts</div>`;
+          }
+        } else {
+          // Desktop: full emojis per metric + points
+          const emojis = metrics.map(m => {
+            if (m === 'workout') return entry.workout?.done === 'yes' ? '💪' : '';
+            if (m === 'steps')   return (entry.steps || 0) > 0 ? '👟' : '';
+            if (m === 'sleep')   return (entry.sleep || 0) > 0 ? '😴' : '';
+            if (m === 'water')   return (entry.water || 0) > 0 ? '💧' : '';
+            if (m === 'macros')  return (entry.macros?.calories || 0) > 0 ? '🥗' : '';
+            return '';
+          }).filter(Boolean).join('');
+          innerHtml += `<div class="cal-day-emojis">${emojis}</div>`;
+          if (entry.points > 0) {
+            innerHtml += `<div class="cal-day-points">${entry.points}pts</div>`;
+          }
         }
-        // Mobile: just a green dot (points already shown above)
-        innerHtml += `<div class="cal-logged-dot cal-mobile-only"></div>`;
       } else if (!isFuture && inRange) {
         innerHtml += `<div class="cal-day-dot"></div>`;
       }
