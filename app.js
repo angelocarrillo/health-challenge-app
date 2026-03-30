@@ -1055,7 +1055,18 @@ function computeInitialGoals(baseline, metrics) {
 function renderMetricSection(metric, challenge, dateStr, existing) {
   const def  = METRIC_DEFS[metric];
   const goal = getGoalForMetric(metric, challenge, dateStr);
-  const goalText = goal ? `Goal: ${formatGoal(metric, goal)}` : '';
+
+  let goalText = goal ? `Goal: ${formatGoal(metric, goal)}` : '';
+
+  // For workouts, also show how many have been logged this week vs cap
+  if (metric === 'workout' && goal) {
+    const weeklyGoal   = goal;
+    const alreadyDone  = getWorkoutsThisWeek(dateStr, challenge, dateStr);
+    const ptsPerWkt    = challenge.mode === 'dynamic'
+      ? Math.round((10 / weeklyGoal) * 100) / 100
+      : (challenge.classicPoints?.workout ?? 2);
+    goalText = `Goal: ${weeklyGoal}/week · ${ptsPerWkt} pts each · ${alreadyDone}/${weeklyGoal} done this week`;
+  }
 
   let body = '';
 
@@ -1140,14 +1151,116 @@ function formatGoal(metric, goal) {
   return '';
 }
 
+// ============================================================
+//  WEEK UTILITIES
+// ============================================================
+
+// Returns the challenge week number (0-indexed) for a given date
+function getWeekIndex(dateStr, challengeStartDate) {
+  const start = new Date(challengeStartDate + 'T00:00:00');
+  const date  = new Date(dateStr + 'T00:00:00');
+  return Math.floor((date - start) / (7 * 24 * 60 * 60 * 1000));
+}
+
+// Returns all dates in the same challenge week as dateStr
+function getWeekDates(dateStr, challengeStartDate) {
+  const weekIdx = getWeekIndex(dateStr, challengeStartDate);
+  const start   = new Date(challengeStartDate + 'T00:00:00');
+  const weekStart = new Date(start.getTime() + weekIdx * 7 * 24 * 60 * 60 * 1000);
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart.getTime() + i * 24 * 60 * 60 * 1000);
+    dates.push(toDateStr(d));
+  }
+  return dates;
+}
+
+// Returns all dates in the PREVIOUS challenge week
+function getPrevWeekDates(dateStr, challengeStartDate) {
+  const weekIdx = getWeekIndex(dateStr, challengeStartDate);
+  if (weekIdx === 0) return [];
+  return getWeekDates(
+    toDateStr(new Date(new Date(challengeStartDate + 'T00:00:00').getTime() + (weekIdx - 1) * 7 * 24 * 60 * 60 * 1000)),
+    challengeStartDate
+  );
+}
+
+// Count how many days in a set of dates the user hit a metric goal
+function countHitDays(dates, metric, goalValue, allEntries, challengeStartDate) {
+  return dates.filter(d => {
+    const entry = allEntries[d];
+    if (!entry) return false;
+    if (metric === 'workout') return entry.workout?.done === 'yes';
+    if (metric === 'steps') {
+      const isRunning     = entry.workout?.type === 'running';
+      const effectiveGoal = isRunning ? Math.round(goalValue * 1.5) : goalValue;
+      return (entry.steps || 0) >= effectiveGoal;
+    }
+    if (metric === 'sleep') return (entry.sleep || 0) >= goalValue;
+    if (metric === 'water') return (entry.water || 0) >= goalValue;
+    return false;
+  }).length;
+}
+
+// ============================================================
+//  DYNAMIC GOAL PROGRESSION ENGINE
+//  Returns the correct goal for a given metric on a given date,
+//  accounting for week-over-week progression based on 5/7 rule.
+// ============================================================
+function getDynamicGoal(metric, dateStr, challenge) {
+  const baseline = logState.baseline;
+  if (!baseline) return null;
+
+  const initialGoal = baseline.goals?.[metric];
+  if (!initialGoal) return null;
+
+  const weekIdx = getWeekIndex(dateStr, challenge.startDate);
+  if (weekIdx === 0) return initialGoal; // Week 1 always uses initial goal
+
+  // Walk through each previous week and apply progression
+  let currentGoal = initialGoal;
+  for (let w = 0; w < weekIdx; w++) {
+    const weekStart = toDateStr(new Date(new Date(challenge.startDate + 'T00:00:00').getTime() + w * 7 * 24 * 60 * 60 * 1000));
+    const weekDates = getWeekDates(weekStart, challenge.startDate);
+    const hitDays   = countHitDays(weekDates, metric, currentGoal, logState.entries, challenge.startDate);
+
+    if (hitDays >= 5) {
+      // Increase goal
+      if (metric === 'workout') currentGoal = Math.min(5, currentGoal + 1);
+      if (metric === 'steps')   currentGoal = Math.min(10000, currentGoal + 1000);
+      if (metric === 'sleep')   currentGoal = Math.min(8, currentGoal + 1);
+      if (metric === 'water')   currentGoal = Math.min(15, currentGoal + 1);
+    }
+    // If fewer than 5/7, goal stays the same (no decrease)
+  }
+
+  return currentGoal;
+}
+
+// ============================================================
+//  COUNT WORKOUTS ALREADY LOGGED THIS WEEK
+//  Used to enforce the weekly workout cap
+// ============================================================
+function getWorkoutsThisWeek(dateStr, challenge, excludeDate = null) {
+  const weekDates = getWeekDates(dateStr, challenge.startDate);
+  return weekDates.filter(d => {
+    if (d === excludeDate) return false; // exclude today (we're recalculating it)
+    const entry = logState.entries[d];
+    return entry?.workout?.done === 'yes';
+  }).length;
+}
+
+// ============================================================
+//  GET GOAL FOR METRIC (public interface used by render + calc)
+// ============================================================
 function getGoalForMetric(metric, challenge, dateStr) {
   if (metric === 'macros') return null;
   if (challenge.mode === 'classic') {
     const defaults = { workout: 5, steps: 8000, sleep: 8, water: 10 };
     return defaults[metric] || null;
   }
-  // Dynamic — read from baseline goals (week-adjusted in future phase)
-  return logState.baseline?.goals?.[metric] || null;
+  // Dynamic mode — use progression engine
+  return getDynamicGoal(metric, dateStr, challenge);
 }
 
 // ============================================================
@@ -1226,58 +1339,80 @@ function calcPointsForEntry(metrics, challenge, dateStr) {
       const done = document.getElementById('log_workout_done')?.value === 'yes';
       if (!done) { results.workout = { pts: 0, note: 'No workout logged' }; continue; }
 
+      const weeklyGoal = goal || 3;
+
+      // Count workouts already logged this week (excluding today so editing works)
+      const workoutsAlreadyThisWeek = getWorkoutsThisWeek(dateStr, c, dateStr);
+      const weeklyPtsAlreadyEarned  = workoutsAlreadyThisWeek * Math.round((10 / weeklyGoal) * 100) / 100;
+      const weeklyPtsCap            = 10;
+
       let pts;
       if (mode === 'classic') {
+        // Classic: fixed points per workout, capped at weeklyGoal workouts
+        const alreadyDoneThisWeek = workoutsAlreadyThisWeek;
+        if (alreadyDoneThisWeek >= weeklyGoal) {
+          results.workout = { pts: 0, note: `Weekly cap reached (${weeklyGoal} workouts) — no more points this week` };
+          continue;
+        }
         pts = c.classicPoints?.workout ?? 2;
       } else {
-        // Dynamic: pts = 10 / weekly goal
-        const weeklyGoal = goal || 3;
-        pts = Math.round((10 / weeklyGoal) * 100) / 100;
+        // Dynamic: pts = 10 / weeklyGoal, capped so total never exceeds 10 pts/week
+        const ptsPerWorkout = Math.round((10 / weeklyGoal) * 100) / 100;
+        const remainingPts  = Math.max(0, Math.round((weeklyPtsCap - weeklyPtsAlreadyEarned) * 100) / 100);
+
+        if (remainingPts <= 0) {
+          results.workout = { pts: 0, note: `Weekly points cap reached (${weeklyPtsCap} pts) — no more workout points this week` };
+          continue;
+        }
+        // Award full points or remaining — whichever is less
+        pts = Math.min(ptsPerWorkout, remainingPts);
+        pts = Math.round(pts * 100) / 100;
       }
-      results.workout = { pts, note: `Workout completed (${logState.workoutType || 'type not set'})` };
+
+      const typeLabel = logState.workoutType
+        ? { strength: 'Strength', running: 'Running Sport', nonrunning: 'Non-Running Sport' }[logState.workoutType] || logState.workoutType
+        : 'type not set';
+      results.workout = { pts, note: `${typeLabel} — ${workoutsAlreadyThisWeek + 1}/${weeklyGoal} workouts this week` };
       total += pts;
 
     } else if (metric === 'steps') {
       const steps = parseInt(document.getElementById('log_steps')?.value) || 0;
       if (!steps) { results.steps = { pts: 0, note: 'No steps entered' }; continue; }
 
-      // If running sport done today, multiply step goal by 1.5
-      const isRunning  = logState.workoutType === 'running';
-      const effectiveGoal = isRunning ? Math.round(goal * 1.5) : goal;
-      const hit = steps >= (effectiveGoal || 8000);
+      // Running sport modifier: step goal × 1.5
+      const isRunning     = logState.workoutType === 'running';
+      const effectiveGoal = isRunning ? Math.round((goal || 8000) * 1.5) : (goal || 8000);
+      const hit           = steps >= effectiveGoal;
 
       let pts = 0;
-      if (hit) {
-        pts = mode === 'classic' ? (c.classicPoints?.steps ?? 1.5) : 1.5;
-      }
+      if (hit) pts = mode === 'classic' ? (c.classicPoints?.steps ?? 1.5) : 1.5;
+
       results.steps = {
         pts,
         note: hit
-          ? `${steps.toLocaleString()} steps ✅ (goal: ${(effectiveGoal||8000).toLocaleString()}${isRunning ? ' — running sport modifier' : ''})`
-          : `${steps.toLocaleString()} steps ❌ (goal: ${(effectiveGoal||8000).toLocaleString()})`
+          ? `${steps.toLocaleString()} steps ✅ (goal: ${effectiveGoal.toLocaleString()}${isRunning ? ' · running ×1.5' : ''})`
+          : `${steps.toLocaleString()} steps ❌ (goal: ${effectiveGoal.toLocaleString()}${isRunning ? ' · running ×1.5' : ''})`
       };
       total += pts;
 
     } else if (metric === 'sleep') {
       const hours = parseFloat(document.getElementById('log_sleep')?.value) || 0;
       if (!hours) { results.sleep = { pts: 0, note: 'No sleep logged' }; continue; }
-      const hit = hours >= (goal || 8);
+      const sleepGoal = goal || 8;
+      const hit = hours >= sleepGoal;
       let pts = 0;
-      if (hit) {
-        pts = mode === 'classic' ? (c.classicPoints?.sleep ?? 1) : 1;
-      }
-      results.sleep = { pts, note: hit ? `${hours}h ✅ (goal: ${goal || 8}h)` : `${hours}h ❌ (goal: ${goal || 8}h)` };
+      if (hit) pts = mode === 'classic' ? (c.classicPoints?.sleep ?? 1) : 1;
+      results.sleep = { pts, note: hit ? `${hours}h ✅ (goal: ${sleepGoal}h)` : `${hours}h ❌ (goal: ${sleepGoal}h)` };
       total += pts;
 
     } else if (metric === 'water') {
       const cups = parseInt(document.getElementById('log_water')?.value) || 0;
       if (!cups) { results.water = { pts: 0, note: 'No water logged' }; continue; }
-      const hit = cups >= (goal || 10);
+      const waterGoal = goal || 10;
+      const hit = cups >= waterGoal;
       let pts = 0;
-      if (hit) {
-        pts = mode === 'classic' ? (c.classicPoints?.water ?? 1) : 1;
-      }
-      results.water = { pts, note: hit ? `${cups} cups ✅ (goal: ${goal || 10})` : `${cups} cups ❌ (goal: ${goal || 10})` };
+      if (hit) pts = mode === 'classic' ? (c.classicPoints?.water ?? 1) : 1;
+      results.water = { pts, note: hit ? `${cups} cups ✅ (goal: ${waterGoal})` : `${cups} cups ❌ (goal: ${waterGoal})` };
       total += pts;
     }
   }
