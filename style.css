@@ -210,10 +210,27 @@ body {
   /* Challenges grid single column */
   .challenges-grid { grid-template-columns: 1fr; }
 
-  /* Calendar cells smaller on mobile — no emojis, just dot + points */
-  .cal-day { min-height: 52px; padding: 5px 3px 4px; }
-  .cal-day-num { font-size: 11px; }
-  .cal-day-points { font-size: 9px; }
+  /* Calendar — fully static grid on mobile, no overflow */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .cal-day {
+    min-height: 44px;
+    padding: 4px 2px 3px;
+    min-width: 0;       /* prevent grid blowout */
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .cal-day-header { font-size: 9px; padding-bottom: 4px; }
+  .cal-day-num { font-size: 10px; }
+  .cal-day-points { font-size: 8px; }
+  .cal-logged-dot { width: 6px; height: 6px; }
+  .cal-month-block { overflow: hidden; }
+  #activityCalendar { overflow: hidden; width: 100%; }
 
 
   /* Modal full width on mobile */
@@ -247,6 +264,8 @@ body {
   /* Prevent horizontal scroll */
   body { overflow-x: hidden; }
   #appScreen { overflow-x: hidden; }
+  .page { overflow-x: hidden; }
+  #logFormContainer { overflow-x: hidden; width: 100%; }
 }
 
 /* ---- PAGES ---- */
