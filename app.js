@@ -1552,16 +1552,28 @@ function destroyChart(id) {
   if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
 }
 
-// Analytics tab switching
+// Analytics tab switching — shared function used by both tab buttons and dropdown
+function switchAnalyticsTab(tabName) {
+  document.querySelectorAll('[data-atab]').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.atab-content').forEach(c => c.classList.remove('active'));
+  const tabBtn = document.querySelector(`[data-atab="${tabName}"]`);
+  if (tabBtn) tabBtn.classList.add('active');
+  document.getElementById(`atab-${tabName}`)?.classList.add('active');
+  // Keep dropdown in sync
+  const sel = document.getElementById('analyticsTabSelect');
+  if (sel) sel.value = tabName;
+  const cid = document.getElementById('analyticsChallengeSelect').value;
+  if (cid) renderAnalyticsTab(tabName, cid);
+}
+
+// Desktop tab buttons
 document.querySelectorAll('[data-atab]').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('[data-atab]').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.atab-content').forEach(c => c.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(`atab-${tab.dataset.atab}`)?.classList.add('active');
-    const cid = document.getElementById('analyticsChallengeSelect').value;
-    if (cid) renderAnalyticsTab(tab.dataset.atab, cid);
-  });
+  tab.addEventListener('click', () => switchAnalyticsTab(tab.dataset.atab));
+});
+
+// Mobile dropdown
+document.getElementById('analyticsTabSelect')?.addEventListener('change', (e) => {
+  switchAnalyticsTab(e.target.value);
 });
 
 // Progress toggle (me vs all)

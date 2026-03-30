@@ -268,6 +268,10 @@ body {
   /* Workout type selector */
   .workout-type-selector { grid-template-columns: 1fr; }
 
+  /* Analytics tabs — hide tab bar, show dropdown on mobile */
+  .analytics-tab-bar { display: none !important; }
+  .analytics-tab-select { display: block !important; max-width: 100%; }
+
   /* Prevent horizontal scroll */
   body { overflow-x: hidden; }
   #appScreen { overflow-x: hidden; }
