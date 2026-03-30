@@ -237,11 +237,18 @@ body {
   .modal { max-width: 100%; border-radius: 20px 20px 0 0; }
   .modal-overlay { align-items: flex-end; padding: 0; }
 
-  /* Leaderboard grid on mobile */
+  /* Leaderboard grid on mobile — hide streak, shrink columns */
   .leaderboard-header,
-  .leaderboard-row { grid-template-columns: 36px 1fr 60px 60px; }
+  .leaderboard-row { grid-template-columns: 32px 1fr 48px 56px; gap: 4px; }
+  /* Hide streak column on mobile */
   .leaderboard-header > div:nth-child(3),
   .leaderboard-row > div:nth-child(3) { display: none; }
+  /* Smaller text for days + points */
+  .lb-days { font-size: 10px; }
+  .lb-pts  { font-size: 14px; }
+  .lb-name { font-size: 12px; }
+  .lb-rank { font-size: 16px; }
+  .leaderboard-row { padding: 10px 10px; }
 
   /* History result grid */
   .history-my-result { grid-template-columns: repeat(2, 1fr); }
