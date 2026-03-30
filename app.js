@@ -1766,6 +1766,11 @@ async function renderLeaderboard(challengeId) {
             ${avatarHtml}
             <div>
               <div class="lb-name">${escHtml(getDisplayName(p))}${isMe ? '<span class="lb-you">YOU</span>' : ''}</div>
+              <div class="lb-meta">
+                <span class="lb-meta-pts">${p.points} pts</span>
+                <span class="lb-meta-days">${p.days} days</span>
+                ${p.streak > 0 ? `<span class="streak-badge">🔥 ${p.streak}</span>` : ''}
+              </div>
             </div>
           </div>
           <div class="lb-streak" style="text-align:right;">${p.streak > 0 ? `<span class="streak-badge">🔥 ${p.streak}</span>` : '—'}</div>

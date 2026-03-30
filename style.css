@@ -237,18 +237,33 @@ body {
   .modal { max-width: 100%; border-radius: 20px 20px 0 0; }
   .modal-overlay { align-items: flex-end; padding: 0; }
 
-  /* Leaderboard grid on mobile — hide streak, shrink columns */
-  .leaderboard-header,
-  .leaderboard-row { grid-template-columns: 32px 1fr 48px 56px; gap: 4px; }
-  /* Hide streak column on mobile */
-  .leaderboard-header > div:nth-child(3),
-  .leaderboard-row > div:nth-child(3) { display: none; }
-  /* Smaller text for days + points */
-  .lb-days { font-size: 10px; }
-  .lb-pts  { font-size: 14px; }
-  .lb-name { font-size: 12px; }
-  .lb-rank { font-size: 16px; }
-  .leaderboard-row { padding: 10px 10px; }
+  /* Leaderboard — 2 column layout on mobile: rank | name+stats */
+  .leaderboard-header { display: none; }
+  .leaderboard-row {
+    grid-template-columns: 32px 1fr;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  /* Hide streak, days, pts columns — we'll show them inside the name cell */
+  .leaderboard-row > div:nth-child(3),
+  .leaderboard-row > div:nth-child(4),
+  .leaderboard-row > div:nth-child(5) { display: none; }
+  /* Stack name + meta info vertically */
+  .lb-user { flex-direction: row; align-items: center; gap: 8px; }
+  .lb-user > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .lb-name { font-size: 13px; font-weight: 600; }
+  .lb-rank { font-size: 18px; }
+  /* Inject points + days as a subtitle under the name via a wrapper */
+  .lb-meta {
+    font-size: 11px;
+    color: var(--text2);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+  .lb-meta-pts  { color: var(--accent); font-weight: 700; font-family: 'Syne', sans-serif; }
+  .lb-meta-days { color: var(--text3); }
 
   /* History result grid */
   .history-my-result { grid-template-columns: repeat(2, 1fr); }
