@@ -891,7 +891,7 @@ function renderCalendar() {
       let innerHtml = `<div class="cal-day-num">${day.getDate()}</div>`;
 
       if (entry) {
-        // Build emoji indicators for each logged metric
+        // Desktop: show emojis per metric + points
         const emojis = metrics.map(m => {
           if (m === 'workout') return entry.workout?.done === 'yes' ? '💪' : '';
           if (m === 'steps')   return (entry.steps || 0) > 0 ? '👟' : '';
@@ -901,10 +901,13 @@ function renderCalendar() {
           return '';
         }).filter(Boolean).join('');
 
-        innerHtml += `<div class="cal-day-emojis">${emojis}</div>`;
+        // Desktop: emojis + points label
+        innerHtml += `<div class="cal-day-emojis cal-desktop-only">${emojis}</div>`;
         if (entry.points > 0) {
-          innerHtml += `<div class="cal-day-points">+${entry.points}pts</div>`;
+          innerHtml += `<div class="cal-day-points">${entry.points}pts</div>`;
         }
+        // Mobile: just a green dot (points already shown above)
+        innerHtml += `<div class="cal-logged-dot cal-mobile-only"></div>`;
       } else if (!isFuture && inRange) {
         innerHtml += `<div class="cal-day-dot"></div>`;
       }
@@ -1222,16 +1225,24 @@ function getDynamicGoal(metric, dateStr, challenge) {
   for (let w = 0; w < weekIdx; w++) {
     const weekStart = toDateStr(new Date(new Date(challenge.startDate + 'T00:00:00').getTime() + w * 7 * 24 * 60 * 60 * 1000));
     const weekDates = getWeekDates(weekStart, challenge.startDate);
-    const hitDays   = countHitDays(weekDates, metric, currentGoal, logState.entries, challenge.startDate);
 
-    if (hitDays >= 5) {
-      // Increase goal
-      if (metric === 'workout') currentGoal = Math.min(5, currentGoal + 1);
-      if (metric === 'steps')   currentGoal = Math.min(10000, currentGoal + 1000);
-      if (metric === 'sleep')   currentGoal = Math.min(8, currentGoal + 1);
-      if (metric === 'water')   currentGoal = Math.min(15, currentGoal + 1);
+    if (metric === 'workout') {
+      // Workout progression: if user hit their weekly workout goal (or more), increase next week's goal
+      const workoutsDone = countHitDays(weekDates, 'workout', currentGoal, logState.entries, challenge.startDate);
+      if (workoutsDone >= currentGoal) {
+        currentGoal = Math.min(5, currentGoal + 1);
+      }
+      // Otherwise stays the same
+    } else {
+      // Steps/sleep/water: use 5/7 days rule
+      const hitDays = countHitDays(weekDates, metric, currentGoal, logState.entries, challenge.startDate);
+      if (hitDays >= 5) {
+        if (metric === 'steps') currentGoal = Math.min(10000, currentGoal + 1000);
+        if (metric === 'sleep') currentGoal = Math.min(8, currentGoal + 1);
+        if (metric === 'water') currentGoal = Math.min(15, currentGoal + 1);
+      }
     }
-    // If fewer than 5/7, goal stays the same (no decrease)
+    // Goal never decreases
   }
 
   return currentGoal;
