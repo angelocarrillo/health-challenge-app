@@ -773,16 +773,33 @@ async function refreshLogPage() {
   try {
     const allSnap = await getDocs(collection(db, 'challenges'));
     const now = new Date();
+    const activeOpts = [], endedOpts = [];
     allSnap.forEach(d => {
       const data = d.data();
       const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
-      if (isMember && new Date(data.endDate) >= now) {
-        const opt = document.createElement('option');
-        opt.value = d.id;
+      if (!isMember) return;
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      if (new Date(data.endDate) < now) {
+        opt.textContent = `${data.name} (Ended)`;
+        endedOpts.push(opt);
+      } else {
         opt.textContent = data.name;
-        select.appendChild(opt);
+        activeOpts.push(opt);
       }
     });
+    if (activeOpts.length > 0) {
+      const grp = document.createElement('optgroup');
+      grp.label = 'Active';
+      activeOpts.forEach(o => grp.appendChild(o));
+      select.appendChild(grp);
+    }
+    if (endedOpts.length > 0) {
+      const grp = document.createElement('optgroup');
+      grp.label = 'Past Challenges — Edit missed entries';
+      endedOpts.forEach(o => grp.appendChild(o));
+      select.appendChild(grp);
+    }
     if (prev && [...select.options].some(o => o.value === prev)) {
       select.value = prev;
       await onChallengeSelected(prev);
@@ -821,8 +838,20 @@ async function onChallengeSelected(challengeId) {
 
   const c = logState.challenge;
   const metrics = c.metrics || ['workout','steps'];
-  const baselinePrompt  = document.getElementById('baselinePrompt');
+  const baselinePrompt    = document.getElementById('baselinePrompt');
   const calendarContainer = document.getElementById('calendarContainer');
+  const isEnded           = new Date(c.endDate + 'T00:00:00') < new Date();
+
+  // Show/hide ended notice
+  let endedNotice = document.getElementById('challengeEndedNotice');
+  if (!endedNotice) {
+    endedNotice = document.createElement('div');
+    endedNotice.id = 'challengeEndedNotice';
+    endedNotice.style.cssText = 'background:rgba(255,179,71,0.1);border:1px solid rgba(255,179,71,0.3);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--warn);display:flex;align-items:center;gap:10px;';
+    endedNotice.innerHTML = '⚠️ This challenge has ended. You can still edit or add missed entries below.';
+    document.getElementById('logFormContainer').prepend(endedNotice);
+  }
+  endedNotice.style.display = isEnded ? 'flex' : 'none';
 
   if (c.mode === 'dynamic' && !logState.baseline) {
     baselinePrompt.style.display  = 'block';
@@ -938,7 +967,14 @@ function renderCalendar() {
   calEl.innerHTML = legendHtml + monthsHtml;
 
   // Attach click handlers to calendar days
-  calEl.querySelectorAll('.cal-day:not(.future):not(.outside-range):not(.empty-cell)').forEach(cell => {
+  // Allow clicking any day within the challenge range, even if in the future relative to today
+  // (after challenge ends, all days become clickable for late entry)
+  calEl.querySelectorAll('.cal-day:not(.outside-range):not(.empty-cell)').forEach(cell => {
+    // On active challenges, still block true future dates
+    const isEnded = new Date(c.endDate + 'T00:00:00') < new Date();
+    const isFutureDay = cell.classList.contains('future');
+    if (!isEnded && isFutureDay) return;
+    cell.style.cursor = 'pointer';
     cell.addEventListener('click', () => openLogModal(cell.dataset.date));
   });
 }
