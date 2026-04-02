@@ -574,7 +574,7 @@ function renderHomeMetricSections() {
   // Temporarily load entries for the selected date across all challenges
   // We use a simplified render — goals shown from representative challenge
   sectionsEl.innerHTML = metricsToShow.map(m =>
-    renderMetricSection(m, repChallenge, dateStr, null)
+    renderMetricSection(m, repChallenge, dateStr, null, true)
   ).join('');
 
   // Attach listeners
@@ -1376,7 +1376,7 @@ function computeInitialGoals(baseline, metrics) {
 // ============================================================
 //  RENDER METRIC SECTION
 // ============================================================
-function renderMetricSection(metric, challenge, dateStr, existing) {
+function renderMetricSection(metric, challenge, dateStr, existing, hideIcon = false) {
   const def  = METRIC_DEFS[metric];
   const goal = getGoalForMetric(metric, challenge, dateStr);
 
@@ -1459,7 +1459,7 @@ function renderMetricSection(metric, challenge, dateStr, existing) {
   return `
     <div class="metric-section" id="section_${metric}">
       <div class="metric-section-header">
-        <span class="metric-section-icon">${def.icon}</span>
+        ${hideIcon ? '' : `<span class="metric-section-icon">${def.icon}</span>`}
         <span class="metric-section-title">${def.label}</span>
         ${goalText ? `<span class="metric-section-goal">${goalText}</span>` : ''}
       </div>
