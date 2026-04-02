@@ -108,24 +108,29 @@ document.querySelectorAll('.mobile-nav-item').forEach(btn => {
   btn.addEventListener('click', () => showPage(btn.dataset.page));
 });
 
-// Hide mobile nav on scroll down, show on scroll up
+// Hide mobile nav on scroll down, show only on genuine scroll up
 (function() {
-  let lastScrollY = 0;
-  let ticking = false;
-  const nav = document.querySelector('.mobile-nav');
+  let lastScrollY = window.scrollY;
+  let ticking     = false;
+  const nav       = document.querySelector('.mobile-nav');
+  const THRESHOLD = 8; // px — must scroll up by this much before nav reappears
 
   window.addEventListener('scroll', () => {
     if (!ticking) {
       window.requestAnimationFrame(() => {
         if (!nav) { ticking = false; return; }
         const currentY = window.scrollY;
-        if (currentY > lastScrollY && currentY > 60) {
-          // Scrolling down — hide nav
+        const delta    = currentY - lastScrollY;
+
+        if (delta > 0 && currentY > 60) {
+          // Genuinely scrolling down — hide
           nav.classList.add('hidden');
-        } else {
-          // Scrolling up — show nav
+        } else if (delta < -THRESHOLD) {
+          // Genuinely scrolling up by enough — show
           nav.classList.remove('hidden');
         }
+        // delta === 0 or tiny bounce at bottom of page — do nothing
+
         lastScrollY = currentY;
         ticking = false;
       });
