@@ -939,19 +939,15 @@ select.input { cursor:pointer; }
 
 .home-log-date-row {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  justify-content: center;
   margin-bottom: 24px;
-  flex-wrap: nowrap;     /* prevent stacking on mobile */
 }
-.home-log-date-row .form-group { margin: 0; flex-shrink: 0; }
-.home-log-date-row .log-date-status {
-  flex-shrink: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.home-log-date-row .form-group {
+  margin: 0;
+  text-align: center;
+  min-width: 220px;
 }
+#homeLogDate { max-width: 220px; text-align: center; }
 
 /* Metric pill toggles */
 .home-metric-toggles {

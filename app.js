@@ -597,12 +597,13 @@ function renderHomeMetricSections() {
 
 function updateHomeDateStatus() {
   const dateStr  = document.getElementById('homeLogDate').value;
-  const statusEl = document.getElementById('homeLogDateStatus');
-  if (!dateStr) return;
-  const d = new Date(dateStr + 'T00:00:00');
-  const label = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
-  statusEl.textContent = label;
-  statusEl.className = 'log-date-status new';
+  const labelEl  = document.getElementById('homeLogDateLabel');
+  if (!dateStr || !labelEl) return;
+  const d       = new Date(dateStr + 'T00:00:00');
+  const today   = toDateStr(new Date());
+  const isToday = dateStr === today;
+  const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+  labelEl.textContent = isToday ? `Today — ${dayName}` : dayName;
 }
 
 function updateHomePointsPreview(metrics, challenge, dateStr) {
