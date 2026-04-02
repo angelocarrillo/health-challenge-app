@@ -128,9 +128,15 @@
             </div>
           </div>
           <div id="baselineFields" class="baseline-fields"></div>
-          <button class="btn-primary" id="saveBaselineBtn" style="margin-top:20px;width:100%;">Save Baseline & Start Logging 🔒</button>
+          <div style="display:flex;gap:12px;margin-top:20px;">
+            <button class="btn-secondary" id="cancelBaselineBtn" style="display:none;">Cancel</button>
+            <button class="btn-primary" id="saveBaselineBtn" style="flex:1;">Save Baseline 🔒</button>
+          </div>
         </div>
         <div id="calendarContainer" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:12px;">
+            <button class="btn-secondary" id="editBaselineBtn" style="display:none;font-size:12px;padding:7px 14px;">📊 Edit Baseline</button>
+          </div>
           <div id="activityCalendar"></div>
         </div>
       </div>

@@ -827,10 +827,14 @@ async function onChallengeSelected(challengeId) {
   if (c.mode === 'dynamic' && !logState.baseline) {
     baselinePrompt.style.display  = 'block';
     calendarContainer.style.display = 'none';
+    document.getElementById('editBaselineBtn').style.display = 'none';
     renderBaselineFields(metrics);
   } else {
     baselinePrompt.style.display  = 'none';
     calendarContainer.style.display = 'block';
+    // Show edit baseline button for dynamic challenges
+    const editBtn = document.getElementById('editBaselineBtn');
+    if (editBtn) editBtn.style.display = c.mode === 'dynamic' ? 'inline-flex' : 'none';
     renderCalendar();
   }
 }
@@ -984,7 +988,7 @@ function closeLogModal() {
 // ============================================================
 //  BASELINE FIELDS
 // ============================================================
-function renderBaselineFields(metrics) {
+function renderBaselineFields(metrics, prefill = null) {
   const fields = document.getElementById('baselineFields');
   const defs   = {
     workout: { label: 'Average workout days per week last month', sub: 'Enter a number from 1–5', min: 1, max: 5, step: 1, placeholder: 'e.g. 3', unit: 'days/week' },
@@ -996,7 +1000,8 @@ function renderBaselineFields(metrics) {
   fields.innerHTML = metrics
     .filter(m => m !== 'macros' && defs[m])
     .map(m => {
-      const d = defs[m];
+      const d        = defs[m];
+      const existing = prefill?.[m] ?? '';
       return `
         <div class="baseline-row">
           <span class="baseline-row-icon">${METRIC_DEFS[m].icon}</span>
@@ -1005,7 +1010,8 @@ function renderBaselineFields(metrics) {
             <div style="font-size:11px;color:var(--text3);margin-top:2px;">${d.sub}</div>
           </div>
           <input type="number" class="input baseline-row-input" id="baseline_${m}"
-            min="${d.min}" max="${d.max}" step="${d.step}" placeholder="${d.placeholder}"/>
+            min="${d.min}" max="${d.max}" step="${d.step}"
+            placeholder="${d.placeholder}" value="${existing}"/>
           <span style="font-size:12px;color:var(--text3);white-space:nowrap;">${d.unit}</span>
         </div>`;
     }).join('');
@@ -1024,20 +1030,50 @@ document.getElementById('saveBaselineBtn').addEventListener('click', async () =>
     baseline[m] = val;
   }
 
-  // Calculate initial weekly goals from baseline
+  // Recalculate goals from new baseline values
   baseline.goals = computeInitialGoals(baseline, metrics);
+
+  const btn = document.getElementById('saveBaselineBtn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
 
   try {
     await setDoc(doc(db, 'challenges', c.id, 'baselines', currentUser.uid), {
-      ...baseline, userId: currentUser.uid, createdAt: serverTimestamp()
+      ...baseline, userId: currentUser.uid, updatedAt: serverTimestamp()
     });
     logState.baseline = baseline;
     document.getElementById('baselinePrompt').style.display   = 'none';
     document.getElementById('calendarContainer').style.display = 'block';
+    document.getElementById('editBaselineBtn').style.display  = 'inline-flex';
     renderCalendar();
   } catch (err) {
     console.error(err); alert('Failed to save baseline. Please try again.');
+  } finally {
+    btn.textContent = 'Save Baseline 🔒'; btn.disabled = false;
   }
+});
+
+// Edit baseline button — reopen form pre-filled with current values
+document.getElementById('editBaselineBtn')?.addEventListener('click', () => {
+  const c       = logState.challenge;
+  const metrics = c?.metrics || ['workout','steps'];
+  document.getElementById('baselinePrompt').style.display    = 'block';
+  document.getElementById('calendarContainer').style.display = 'none';
+  document.getElementById('editBaselineBtn').style.display   = 'none';
+  // Update heading to say "Edit" and show cancel button
+  const heading = document.querySelector('#baselinePrompt h4');
+  if (heading) heading.textContent = 'Edit Your Baseline';
+  document.getElementById('cancelBaselineBtn').style.display = 'inline-flex';
+  renderBaselineFields(metrics, logState.baseline);
+});
+
+// Cancel baseline edit — go back to calendar
+document.getElementById('cancelBaselineBtn')?.addEventListener('click', () => {
+  document.getElementById('baselinePrompt').style.display    = 'none';
+  document.getElementById('calendarContainer').style.display = 'block';
+  document.getElementById('editBaselineBtn').style.display   = 'inline-flex';
+  document.getElementById('cancelBaselineBtn').style.display = 'none';
+  const heading = document.querySelector('#baselinePrompt h4');
+  if (heading) heading.textContent = 'Set Your Baseline';
 });
 
 function computeInitialGoals(baseline, metrics) {
@@ -1749,8 +1785,10 @@ async function renderLeaderboard(challengeId) {
     </div>
 
     <div class="leaderboard-header">
-      <div>Rank</div><div>Participant</div><div style="text-align:right;">Streak</div>
-      <div style="text-align:right;">Days</div><div style="text-align:right;">Points</div>
+      <div>Rank</div><div>Participant</div>
+      <div style="text-align:right;">Streak</div>
+      <div style="text-align:right;">Days</div>
+      <div style="text-align:right;">Points</div>
     </div>
 
     ${ranked.map((p, i) => {
