@@ -1864,15 +1864,7 @@ document.getElementById('analyticsTabSelect')?.addEventListener('change', (e) =>
   switchAnalyticsTab(e.target.value);
 });
 
-// Progress toggle (me vs all)
-document.querySelectorAll('#progressToggle .atoggle-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#progressToggle .atoggle-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const cid = document.getElementById('analyticsChallengeSelect').value;
-    if (cid) renderProgressCharts(cid, btn.dataset.view);
-  });
-});
+// Progress toggle removed — charts now show all participants by default
 
 // Breakdown toggle
 document.querySelectorAll('#breakdownToggle .atoggle-btn').forEach(btn => {
@@ -1938,7 +1930,7 @@ async function populateAnalyticsSelector() {
 
 async function renderAnalyticsTab(tab, challengeId) {
   if (tab === 'leaderboard') await renderLeaderboard(challengeId);
-  if (tab === 'progress')    await renderProgressCharts(challengeId, document.querySelector('#progressToggle .atoggle-btn.active')?.dataset.view || 'me');
+  if (tab === 'progress')    await renderProgressCharts(challengeId);
   if (tab === 'group')       await renderGroupCharts(challengeId);
   if (tab === 'breakdown')   await renderBreakdown(challengeId, document.querySelector('#breakdownToggle .atoggle-btn.active')?.dataset.view || 'me');
   if (tab === 'history')     await renderHistory();
@@ -2071,72 +2063,156 @@ async function renderLeaderboard(challengeId) {
 }
 
 // ---- PROGRESS CHARTS ----
-async function renderProgressCharts(challengeId, view) {
+async function renderProgressCharts(challengeId) {
   const data = await fetchChallengeData(challengeId);
   if (!data) return;
   const { challenge, logs } = data;
 
-  const start    = challenge.startDate;
+  const metrics      = challenge.metrics || ['workout','steps'];
+  const participants = challenge.participants || [];
+  const isDark       = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor    = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textColor    = isDark ? '#8b90a8' : '#5a6070';
+  const container    = document.getElementById('progressChartsContainer');
+
+  // Destroy all old progress charts
+  Object.keys(chartInstances).filter(k => k.startsWith('prog_')).forEach(k => destroyChart(k));
+  container.innerHTML = '';
+
+  // Collect all logged dates sorted
   const allDates = [...new Set(logs.map(l => l.date))].sort();
-  const weeks    = [...new Set(allDates.map(d => getWeekLabel(d, start)))];
+  if (allDates.length === 0) {
+    container.innerHTML = '<div class="empty-state"><span>📈</span><p>No data logged yet for this challenge.</p></div>';
+    return;
+  }
 
-  destroyChart('weeklyBar');
-  destroyChart('cumulativeLine');
-
-  const ctxBar  = document.getElementById('weeklyBarChart').getContext('2d');
-  const ctxLine = document.getElementById('cumulativeLineChart').getContext('2d');
-  const isDark  = document.documentElement.getAttribute('data-theme') === 'dark';
-  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  const textColor = isDark ? '#8b90a8' : '#5a6070';
-
-  const chartDefaults = {
+  const chartOpts = (yLabel, unit) => ({
     responsive: true,
-    plugins: { legend: { labels: { color: textColor, font: { family: 'DM Sans' } } } },
+    plugins: {
+      legend: { labels: { color: textColor, font: { family: 'DM Sans', size: 12 }, usePointStyle: true, pointStyleWidth: 8 } },
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} ${unit}` } }
+    },
     scales: {
-      x: { grid: { color: gridColor }, ticks: { color: textColor } },
-      y: { grid: { color: gridColor }, ticks: { color: textColor }, beginAtZero: true }
+      x: { grid: { color: gridColor }, ticks: { color: textColor, maxTicksLimit: 10, maxRotation: 45 } },
+      y: { grid: { color: gridColor }, ticks: { color: textColor }, beginAtZero: true, title: { display: true, text: yLabel, color: textColor, font: { size: 11 } } }
     }
-  };
+  });
 
-  if (view === 'me') {
-    const myLogs = logs.filter(l => l.userId === currentUser.uid);
-    const weeklyPts = weeks.map(w => myLogs.filter(l => getWeekLabel(l.date, start) === w).reduce((s, l) => s + (l.points||0), 0));
-    const cumulative = weeklyPts.reduce((acc, v, i) => { acc.push((acc[i-1] || 0) + v); return acc; }, []);
+  // ---- WORKOUTS PER WEEK bar chart ----
+  if (metrics.includes('workout')) {
+    const weeks = [...new Set(allDates.map(d => getWeekLabel(d, challenge.startDate)))];
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.style.marginBottom = '20px';
+    card.innerHTML = `<div class="chart-title">💪 Workouts Per Week</div><canvas id="prog_workout" height="100"></canvas>`;
+    container.appendChild(card);
 
-    chartInstances.weeklyBar = new Chart(ctxBar, {
-      type: 'bar',
-      data: { labels: weeks, datasets: [{ label: 'My Points', data: weeklyPts, backgroundColor: '#00e5a0', borderRadius: 6 }] },
-      options: chartDefaults
-    });
-    chartInstances.cumulativeLine = new Chart(ctxLine, {
-      type: 'line',
-      data: { labels: weeks, datasets: [{ label: 'My Cumulative Points', data: cumulative, borderColor: '#00e5a0', backgroundColor: 'rgba(0,229,160,0.1)', tension: 0.4, fill: true, pointBackgroundColor: '#00e5a0' }] },
-      options: chartDefaults
-    });
-  } else {
-    // All participants
-    const participants = challenge.participants || [];
-    const barDatasets = participants.map((p, i) => ({
+    const datasets = participants.map((p, i) => ({
       label: getDisplayName(p),
-      data: weeks.map(w => logs.filter(l => l.userId === p.uid && getWeekLabel(l.date, start) === w).reduce((s, l) => s + (l.points||0), 0)),
-      backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
-      borderRadius: 4,
+      data: weeks.map(w => {
+        const weekLogs = logs.filter(l => l.userId === p.uid && getWeekLabel(l.date, challenge.startDate) === w);
+        return weekLogs.filter(l => l.workout?.done === 'yes').length;
+      }),
+      backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + 'cc',
+      borderColor:     CHART_COLORS[i % CHART_COLORS.length],
+      borderRadius: 5,
+      borderWidth: 1,
     }));
-    const lineDatasets = participants.map((p, i) => {
-      const weeklyP = weeks.map(w => logs.filter(l => l.userId === p.uid && getWeekLabel(l.date, start) === w).reduce((s, l) => s + (l.points||0), 0));
-      const cum = weeklyP.reduce((acc, v, j) => { acc.push((acc[j-1] || 0) + v); return acc; }, []);
-      return { label: getDisplayName(p), data: cum, borderColor: CHART_COLORS[i % CHART_COLORS.length], backgroundColor: 'transparent', tension: 0.4, pointBackgroundColor: CHART_COLORS[i % CHART_COLORS.length] };
-    });
-    chartInstances.weeklyBar = new Chart(ctxBar, {
-      type: 'bar',
-      data: { labels: weeks, datasets: barDatasets },
-      options: { ...chartDefaults, plugins: { ...chartDefaults.plugins } }
-    });
-    chartInstances.cumulativeLine = new Chart(ctxLine, {
-      type: 'line',
-      data: { labels: weeks, datasets: lineDatasets },
-      options: chartDefaults
-    });
+
+    chartInstances.prog_workout = new Chart(
+      document.getElementById('prog_workout').getContext('2d'),
+      { type: 'bar', data: { labels: weeks, datasets }, options: chartOpts('Workouts', 'workouts') }
+    );
+  }
+
+  // ---- STEPS per day dotted line chart ----
+  if (metrics.includes('steps')) {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.style.marginBottom = '20px';
+    card.innerHTML = `<div class="chart-title">👟 Steps Per Day</div><canvas id="prog_steps" height="100"></canvas>`;
+    container.appendChild(card);
+
+    const datasets = participants.map((p, i) => ({
+      label: getDisplayName(p),
+      data: allDates.map(d => {
+        const entry = logs.find(l => l.userId === p.uid && l.date === d);
+        return entry?.steps ?? null;
+      }),
+      borderColor:         CHART_COLORS[i % CHART_COLORS.length],
+      backgroundColor:     'transparent',
+      borderWidth: 2,
+      borderDash: [4, 4],
+      pointRadius: 3,
+      pointBackgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+      tension: 0.3,
+      spanGaps: false,
+    }));
+
+    chartInstances.prog_steps = new Chart(
+      document.getElementById('prog_steps').getContext('2d'),
+      { type: 'line', data: { labels: allDates, datasets }, options: chartOpts('Steps', 'steps') }
+    );
+  }
+
+  // ---- SLEEP per day dotted line chart ----
+  if (metrics.includes('sleep')) {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.style.marginBottom = '20px';
+    card.innerHTML = `<div class="chart-title">😴 Sleep Per Night (hours)</div><canvas id="prog_sleep" height="100"></canvas>`;
+    container.appendChild(card);
+
+    const datasets = participants.map((p, i) => ({
+      label: getDisplayName(p),
+      data: allDates.map(d => {
+        const entry = logs.find(l => l.userId === p.uid && l.date === d);
+        return entry?.sleep ?? null;
+      }),
+      borderColor:         CHART_COLORS[i % CHART_COLORS.length],
+      backgroundColor:     'transparent',
+      borderWidth: 2,
+      borderDash: [4, 4],
+      pointRadius: 3,
+      pointBackgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+      tension: 0.3,
+      spanGaps: false,
+    }));
+
+    chartInstances.prog_sleep = new Chart(
+      document.getElementById('prog_sleep').getContext('2d'),
+      { type: 'line', data: { labels: allDates, datasets }, options: chartOpts('Hours', 'hrs') }
+    );
+  }
+
+  // ---- WATER per day dotted line chart ----
+  if (metrics.includes('water')) {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.style.marginBottom = '20px';
+    card.innerHTML = `<div class="chart-title">💧 Water Per Day (cups)</div><canvas id="prog_water" height="100"></canvas>`;
+    container.appendChild(card);
+
+    const datasets = participants.map((p, i) => ({
+      label: getDisplayName(p),
+      data: allDates.map(d => {
+        const entry = logs.find(l => l.userId === p.uid && l.date === d);
+        return entry?.water ?? null;
+      }),
+      borderColor:         CHART_COLORS[i % CHART_COLORS.length],
+      backgroundColor:     'transparent',
+      borderWidth: 2,
+      borderDash: [4, 4],
+      pointRadius: 3,
+      pointBackgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+      tension: 0.3,
+      spanGaps: false,
+    }));
+
+    chartInstances.prog_water = new Chart(
+      document.getElementById('prog_water').getContext('2d'),
+      { type: 'line', data: { labels: allDates, datasets }, options: chartOpts('Cups', 'cups') }
+    );
   }
 }
 
