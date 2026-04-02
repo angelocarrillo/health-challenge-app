@@ -464,64 +464,276 @@ function renderChallengeCard(c) {
 }
 
 // ============================================================
-//  DASHBOARD
+//  HOME PAGE — Universal Daily Log
 // ============================================================
+
+// User's preferred metrics (persisted to localStorage)
+const ALL_METRICS = ['workout','steps','sleep','water','macros'];
+let homeVisibleMetrics = JSON.parse(localStorage.getItem('fw-home-metrics') || 'null') || ALL_METRICS;
+let homeWorkoutType = null;
+let homeChallenges  = []; // active + recently ended challenges user is in
+
 async function loadDashboard() {
   if (!currentUser) return;
   try {
     const allSnap = await getDocs(collection(db, 'challenges'));
-    let active = 0, minDays = Infinity;
-    const now = new Date();
-    const activeChallenges = [];
+    const now     = new Date();
+    const recently = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days grace period
+    homeChallenges  = [];
 
     allSnap.forEach(d => {
       const data = d.data();
       const isMember = (data.participants || []).some(p => p.uid === currentUser.uid);
       if (!isMember) return;
-      const end = new Date(data.endDate);
-      if (end >= now && data.status === 'active') {
-        active++;
-        const days = Math.ceil((end - now) / 86400000);
-        if (days < minDays) minDays = days;
-        activeChallenges.push({id: d.id, ...data});
-      }
+      const end = new Date(data.endDate + 'T00:00:00');
+      // Include active + challenges that ended within the last 7 days
+      if (end >= recently) homeChallenges.push({ id: d.id, ...data });
     });
 
-    // Tally total points across all active challenges
-    let totalPts = 0;
-    let bestRank = Infinity;
-    for (const c of activeChallenges) {
-      const logsSnap = await getDocs(query(collection(db, 'activityLogs'), where('challengeId', '==', c.id)));
-      const allLogs = [];
-      logsSnap.forEach(d => allLogs.push(d.data()));
-      const myPts = allLogs.filter(l => l.userId === currentUser.uid).reduce((s,l) => s+(l.points||0), 0);
-      totalPts += myPts;
-      // Compute rank in this challenge
-      const userTotals = {};
-      allLogs.forEach(l => { userTotals[l.userId] = (userTotals[l.userId]||0) + (l.points||0); });
-      const sorted = Object.values(userTotals).sort((a,b) => b-a);
-      const rank   = sorted.indexOf(myPts) + 1 || (c.participants||[]).length;
-      if (rank < bestRank) bestRank = rank;
-    }
-    document.getElementById('statActiveChallenges').textContent = active;
-    document.getElementById('statTotalPoints').textContent = Math.round(totalPts * 10) / 10;
-    document.getElementById('statCurrentRank').textContent = bestRank === Infinity ? '—' : `#${bestRank}`;
-    document.getElementById('statDaysLeft').textContent = minDays === Infinity ? '—' : minDays;
+    const noChallenges = document.getElementById('homeNoChallenges');
+    const logContainer = document.getElementById('homeLogContainer');
 
-    const listEl = document.getElementById('activeChallengesList');
-    if (activeChallenges.length === 0) {
-      listEl.innerHTML = `<div class="empty-state"><span>🏁</span><p>No active challenges yet.<br/>Create one or join via invite!</p><button class="btn-primary" onclick="showPage('challenges')">Browse Challenges</button></div>`;
-    } else {
-      listEl.innerHTML = activeChallenges.map(c => renderChallengeCard(c)).join('');
-      listEl.querySelectorAll('.challenge-card').forEach(card => {
-        card.addEventListener('click', () => {
-          const c = activeChallenges.find(x => x.id === card.dataset.id);
-          if (c) showChallengeDetail(c.id, c);
-        });
-      });
+    if (homeChallenges.length === 0) {
+      noChallenges.style.display = 'block';
+      logContainer.style.display = 'none';
+      return;
     }
+
+    noChallenges.style.display = 'none';
+    logContainer.style.display = 'block';
+
+    // Set up date picker
+    const today = toDateStr(new Date());
+    const homeDate = document.getElementById('homeLogDate');
+    if (!homeDate.value) homeDate.value = today;
+    homeDate.max = today;
+
+    // Render metric pills
+    renderHomeMetricPills();
+    renderHomeMetricSections();
+    updateHomeDateStatus();
+
   } catch (err) { console.error(err); }
 }
+
+function renderHomeMetricPills() {
+  document.querySelectorAll('.home-metric-pill').forEach(pill => {
+    const active = homeVisibleMetrics.includes(pill.dataset.metric);
+    pill.classList.toggle('active', active);
+  });
+}
+
+function renderHomeMetricSections() {
+  const dateStr = document.getElementById('homeLogDate').value;
+  if (!dateStr || homeChallenges.length === 0) return;
+
+  // Union of all metrics across all challenges
+  const allActiveMetrics = [...new Set(
+    homeChallenges.flatMap(c => c.metrics || ['workout','steps'])
+  )];
+
+  // Filter to what user wants to see, and what at least one challenge tracks
+  const metricsToShow = homeVisibleMetrics.filter(m => allActiveMetrics.includes(m));
+
+  const sectionsEl = document.getElementById('homeMetricSections');
+
+  // Use a representative challenge for goal display (first active one)
+  const repChallenge = homeChallenges.find(c => new Date(c.endDate) >= new Date()) || homeChallenges[0];
+
+  // Temporarily load entries for the selected date across all challenges
+  // We use a simplified render — goals shown from representative challenge
+  sectionsEl.innerHTML = metricsToShow.map(m =>
+    renderMetricSection(m, repChallenge, dateStr, null)
+  ).join('');
+
+  // Attach listeners
+  const inputIds = ['log_workout_done','log_steps','log_sleep','log_water','log_calories','log_protein','log_carbs','log_fat'];
+  document.querySelectorAll('.workout-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      homeWorkoutType = btn.dataset.type;
+      logState.workoutType = homeWorkoutType;
+      updateHomePointsPreview(metricsToShow, repChallenge, dateStr);
+    });
+  });
+  inputIds.forEach(id => {
+    const el = document.getElementById(id);
+    el?.addEventListener('input',  () => updateHomePointsPreview(metricsToShow, repChallenge, dateStr));
+    el?.addEventListener('change', () => updateHomePointsPreview(metricsToShow, repChallenge, dateStr));
+  });
+}
+
+function updateHomeDateStatus() {
+  const dateStr  = document.getElementById('homeLogDate').value;
+  const statusEl = document.getElementById('homeLogDateStatus');
+  if (!dateStr) return;
+  const d = new Date(dateStr + 'T00:00:00');
+  const label = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+  statusEl.textContent = label;
+  statusEl.className = 'log-date-status new';
+}
+
+function updateHomePointsPreview(metrics, challenge, dateStr) {
+  logState.workoutType = homeWorkoutType;
+  const { results, total } = calcPointsForEntry(metrics, challenge, dateStr);
+  const previewEl    = document.getElementById('homePointsPreview');
+  const breakdownEl  = document.getElementById('homePointsBreakdown');
+  const totalEl      = document.getElementById('homePointsTotal');
+
+  const hasInput = metrics.some(m => {
+    if (m === 'workout') return document.getElementById('log_workout_done')?.value;
+    if (m === 'steps')   return document.getElementById('log_steps')?.value;
+    if (m === 'sleep')   return document.getElementById('log_sleep')?.value;
+    if (m === 'water')   return document.getElementById('log_water')?.value;
+    return false;
+  });
+
+  if (!hasInput) { previewEl.style.display = 'none'; return; }
+  previewEl.style.display = 'block';
+  breakdownEl.innerHTML = Object.entries(results).map(([m, r]) => `
+    <div class="points-row">
+      <span class="points-row-label">${METRIC_DEFS[m]?.icon} ${METRIC_DEFS[m]?.label} — ${r.note}</span>
+      <span class="points-row-value">${r.pts > 0 ? '+' + r.pts : '—'}</span>
+    </div>`).join('');
+  totalEl.innerHTML = `<span>Est. Points per Challenge</span><span>+${total} pts</span>`;
+}
+
+// Wire up home page controls
+document.getElementById('homeLogDate')?.addEventListener('change', () => {
+  homeWorkoutType = null;
+  logState.workoutType = null;
+  updateHomeDateStatus();
+  renderHomeMetricSections();
+});
+
+document.getElementById('homeClearBtn')?.addEventListener('click', () => {
+  ['log_workout_done','log_steps','log_sleep','log_water','log_calories','log_protein','log_carbs','log_fat']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
+  homeWorkoutType = null;
+  logState.workoutType = null;
+  document.getElementById('homePointsPreview').style.display = 'none';
+  document.getElementById('homeExistingNote').textContent = '';
+});
+
+document.querySelectorAll('.home-metric-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    pill.classList.toggle('active');
+    homeVisibleMetrics = [...document.querySelectorAll('.home-metric-pill.active')].map(p => p.dataset.metric);
+    localStorage.setItem('fw-home-metrics', JSON.stringify(homeVisibleMetrics));
+    renderHomeMetricSections();
+  });
+});
+
+document.getElementById('homeSubmitBtn')?.addEventListener('click', () => saveHomeLog());
+
+// ---- SAVE HOME LOG — applies to all challenges ----
+async function saveHomeLog() {
+  if (!currentUser || homeChallenges.length === 0) return;
+
+  const dateStr = document.getElementById('homeLogDate').value;
+  if (!dateStr) { alert('Please select a date.'); return; }
+
+  const btn = document.getElementById('homeSubmitBtn');
+  btn.textContent = 'Saving...'; btn.disabled = true;
+
+  const results = [];
+
+  try {
+    for (const c of homeChallenges) {
+      const metrics      = c.metrics || ['workout','steps'];
+      const metricsToLog = homeVisibleMetrics.filter(m => metrics.includes(m));
+
+      // Skip if date is outside this challenge's range
+      const start = new Date(c.startDate + 'T00:00:00');
+      const end   = new Date(c.endDate   + 'T00:00:00');
+      const date  = new Date(dateStr      + 'T00:00:00');
+      if (date < start || date > end) {
+        results.push({ name: c.name, skipped: true, reason: 'Date outside challenge range' });
+        continue;
+      }
+
+      // Load baseline for dynamic challenges if needed
+      if (c.mode === 'dynamic') {
+        const bSnap = await getDoc(doc(db, 'challenges', c.id, 'baselines', currentUser.uid));
+        logState.baseline = bSnap.exists() ? bSnap.data() : null;
+      } else {
+        logState.baseline = null;
+      }
+      logState.challenge  = c;
+      logState.workoutType = homeWorkoutType;
+
+      // Load existing entries for this challenge (needed for weekly cap calc)
+      const eSnap = await getDocs(query(
+        collection(db, 'activityLogs'),
+        where('challengeId', '==', c.id),
+        where('userId', '==', currentUser.uid)
+      ));
+      logState.entries = {};
+      eSnap.forEach(d => { logState.entries[d.data().date] = { id: d.id, ...d.data() }; });
+
+      const { total } = calcPointsForEntry(metricsToLog, c, dateStr);
+
+      const entryData = {
+        challengeId: c.id,
+        userId:      currentUser.uid,
+        userName:    currentUser.displayName || currentUser.email,
+        date:        dateStr,
+        points:      total,
+        updatedAt:   serverTimestamp(),
+      };
+      if (metricsToLog.includes('workout')) {
+        entryData.workout = {
+          done: document.getElementById('log_workout_done')?.value || 'no',
+          type: homeWorkoutType || null,
+        };
+      }
+      if (metricsToLog.includes('steps'))  entryData.steps  = parseInt(document.getElementById('log_steps')?.value)  || 0;
+      if (metricsToLog.includes('sleep'))  entryData.sleep  = parseFloat(document.getElementById('log_sleep')?.value) || 0;
+      if (metricsToLog.includes('water'))  entryData.water  = parseInt(document.getElementById('log_water')?.value)  || 0;
+      if (metricsToLog.includes('macros')) {
+        entryData.macros = {
+          calories: parseInt(document.getElementById('log_calories')?.value) || 0,
+          protein:  parseInt(document.getElementById('log_protein')?.value)  || 0,
+          carbs:    parseInt(document.getElementById('log_carbs')?.value)    || 0,
+          fat:      parseInt(document.getElementById('log_fat')?.value)      || 0,
+        };
+      }
+
+      const docId = `${c.id}_${currentUser.uid}_${dateStr}`;
+      await setDoc(doc(db, 'activityLogs', docId), entryData);
+      results.push({ name: c.name, pts: total, skipped: false });
+    }
+
+    // Show confirmation modal
+    showSaveConfirmModal(results);
+
+  } catch (err) {
+    console.error(err);
+    alert('Failed to save. Please try again.');
+  } finally {
+    btn.textContent = 'Save to All Challenges 🔒';
+    btn.disabled = false;
+  }
+}
+
+function showSaveConfirmModal(results) {
+  const listEl = document.getElementById('saveConfirmList');
+  listEl.innerHTML = results.map(r => `
+    <div class="save-confirm-row">
+      <span class="save-confirm-name">${escHtml(r.name)}</span>
+      ${r.skipped
+        ? `<span class="save-confirm-skip">${r.reason}</span>`
+        : `<span class="save-confirm-pts">+${r.pts} pts</span>`}
+    </div>`).join('');
+  document.getElementById('saveConfirmModal').classList.add('active');
+}
+
+const saveConfirmModal = document.getElementById('saveConfirmModal');
+document.getElementById('closeSaveConfirmModal')?.addEventListener('click', () => saveConfirmModal.classList.remove('active'));
+document.getElementById('closeSaveConfirmBtn')?.addEventListener('click',   () => saveConfirmModal.classList.remove('active'));
+saveConfirmModal?.addEventListener('click', e => { if (e.target === saveConfirmModal) saveConfirmModal.classList.remove('active'); });
 
 // ============================================================
 //  CHALLENGE DETAIL MODAL

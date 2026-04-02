@@ -40,9 +40,9 @@
     <nav class="navbar">
       <div class="nav-logo"><span>🔒</span><span class="nav-logo-text"> Health Challenge</span></div>
       <div class="nav-links">
-        <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
+        <a href="#" class="nav-link active" data-page="dashboard">Home</a>
         <a href="#" class="nav-link" data-page="challenges">Challenges</a>
-        <a href="#" class="nav-link" data-page="log">Log Activity</a>
+        <a href="#" class="nav-link" data-page="log">History</a>
         <a href="#" class="nav-link" data-page="analytics">Analytics</a>
       </div>
       <div class="nav-user">
@@ -55,27 +55,67 @@
       </div>
     </nav>
 
-    <!-- DASHBOARD -->
+    <!-- HOME — Universal Daily Log -->
     <div id="page-dashboard" class="page active">
       <div class="page-header">
         <div>
-          <h2 class="page-title">Welcome back, <span id="greetName"></span> 👋</h2>
-          <p class="page-sub">Here's your challenge overview</p>
+          <h2 class="page-title">Hey <span id="greetName"></span>! 👋</h2>
+          <p class="page-sub">Log your activity for today — applies to all your active challenges automatically</p>
         </div>
       </div>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-value" id="statActiveChallenges">—</div><div class="stat-label">Active Challenges</div></div>
-        <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-value" id="statTotalPoints">—</div><div class="stat-label">Total Points</div></div>
-        <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-value" id="statCurrentRank">—</div><div class="stat-label">Current Rank</div></div>
-        <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-value" id="statDaysLeft">—</div><div class="stat-label">Days Left</div></div>
-      </div>
-      <div class="section-title">Your Active Challenges</div>
-      <div id="activeChallengesList" class="challenges-list">
+
+      <!-- No challenges state -->
+      <div id="homeNoChallenges" style="display:none;">
         <div class="empty-state">
           <span>🏁</span>
-          <p>No active challenges yet.<br/>Create one or join via invite!</p>
-          <button class="btn-primary" onclick="showPage('challenges')">Browse Challenges</button>
+          <p>You're not in any active challenges yet.<br/>Create one or join via invite code!</p>
+          <button class="btn-primary" onclick="showPage('challenges')">Go to Challenges</button>
         </div>
+      </div>
+
+      <!-- Universal log form -->
+      <div id="homeLogContainer" style="display:none;">
+
+        <!-- Date picker -->
+        <div class="home-log-date-row">
+          <div class="form-group" style="margin:0;">
+            <label>Date</label>
+            <input type="date" id="homeLogDate" class="input" style="max-width:200px;"/>
+          </div>
+          <div id="homeLogDateStatus" class="log-date-status"></div>
+        </div>
+
+        <!-- Metric toggles — user customises what they see -->
+        <div class="home-metric-toggles" id="homeMetricToggles">
+          <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">
+            Showing Metrics <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;">(tap to toggle)</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="home-metric-pill active" data-metric="workout">💪 Workout</button>
+            <button class="home-metric-pill active" data-metric="steps">👟 Steps</button>
+            <button class="home-metric-pill active" data-metric="sleep">😴 Sleep</button>
+            <button class="home-metric-pill active" data-metric="water">💧 Water</button>
+            <button class="home-metric-pill active" data-metric="macros">🥗 Macros</button>
+          </div>
+        </div>
+
+        <!-- Metric input sections -->
+        <div id="homeMetricSections" class="metric-sections"></div>
+
+        <!-- Points preview -->
+        <div class="points-preview" id="homePointsPreview" style="display:none;">
+          <div class="points-preview-title">⭐ Estimated Points</div>
+          <div id="homePointsBreakdown" class="points-breakdown"></div>
+          <div class="points-total" id="homePointsTotal"></div>
+        </div>
+
+        <!-- Save button -->
+        <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end;align-items:center;">
+          <div id="homeExistingNote" style="font-size:12px;color:var(--warn);flex:1;"></div>
+          <button class="btn-secondary" id="homeClearBtn">Clear</button>
+          <button class="btn-primary" id="homeSubmitBtn">Save to All Challenges 🔒</button>
+        </div>
+
       </div>
     </div>
 
@@ -107,10 +147,10 @@
       </div>
     </div>
 
-    <!-- LOG ACTIVITY -->
+    <!-- HISTORY — Per-challenge calendar view -->
     <div id="page-log" class="page">
       <div class="page-header">
-        <div><h2 class="page-title">Log Activity</h2><p class="page-sub">Track your daily health metrics</p></div>
+        <div><h2 class="page-title">History</h2><p class="page-sub">Review and edit entries per challenge</p></div>
       </div>
       <div class="form-group" style="max-width:420px;margin-bottom:28px;">
         <label>Select Challenge</label>
@@ -233,8 +273,8 @@
           <span class="mobile-nav-label">Challenges</span>
         </button>
         <button class="mobile-nav-item" data-page="log">
-          <span class="mobile-nav-icon">📝</span>
-          <span class="mobile-nav-label">Log</span>
+          <span class="mobile-nav-icon">📅</span>
+          <span class="mobile-nav-label">History</span>
         </button>
         <button class="mobile-nav-item" data-page="analytics">
           <span class="mobile-nav-icon">📊</span>
@@ -369,6 +409,21 @@
         <button class="modal-close" id="closeDetailModal">✕</button>
       </div>
       <div class="modal-body" id="challengeDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- SAVE CONFIRMATION MODAL -->
+  <div id="saveConfirmModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>✅ Entry Saved!</h3>
+        <button class="modal-close" id="closeSaveConfirmModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text2);font-size:14px;margin-bottom:20px;">Your activity was applied to the following challenges:</p>
+        <div id="saveConfirmList"></div>
+        <button class="btn-primary" id="closeSaveConfirmBtn" style="width:100%;margin-top:20px;">Done</button>
+      </div>
     </div>
   </div>
 
