@@ -932,10 +932,18 @@ select.input { cursor:pointer; }
 
 .home-log-date-row {
   display: flex;
-  align-items: flex-end;
-  gap: 20px;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 24px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;     /* prevent stacking on mobile */
+}
+.home-log-date-row .form-group { margin: 0; flex-shrink: 0; }
+.home-log-date-row .log-date-status {
+  flex-shrink: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Metric pill toggles */
@@ -946,9 +954,23 @@ select.input { cursor:pointer; }
   padding: 16px 20px;
   margin-bottom: 24px;
 }
+.home-metric-toggles > div:first-child {
+  margin-bottom: 10px;
+}
+/* Pills row — evenly spaced on desktop, wrap on mobile */
+.home-metric-pills-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+@media (max-width: 768px) {
+  .home-metric-pills-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
 .home-metric-pill {
-  padding: 6px 14px;
-  border-radius: 100px;
+  padding: 8px 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg3);
   color: var(--text2);
@@ -957,6 +979,8 @@ select.input { cursor:pointer; }
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition);
+  text-align: center;
+  white-space: nowrap;
 }
 .home-metric-pill.active {
   background: rgba(0,229,160,0.1);
@@ -965,6 +989,13 @@ select.input { cursor:pointer; }
   font-weight: 600;
 }
 .home-metric-pill:hover { border-color: var(--accent2); }
+
+/* Center metric sections on desktop */
+#homeMetricSections {
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
+}
 
 /* Challenge applied list in save confirmation */
 .save-confirm-row {
