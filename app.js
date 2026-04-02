@@ -2086,15 +2086,28 @@ async function renderProgressCharts(challengeId) {
     return;
   }
 
+  const isMobile = window.innerWidth <= 768;
   const chartOpts = (yLabel, unit) => ({
     responsive: true,
+    maintainAspectRatio: !isMobile,
     plugins: {
-      legend: { labels: { color: textColor, font: { family: 'DM Sans', size: 12 }, usePointStyle: true, pointStyleWidth: 8 } },
+      legend: {
+        position: isMobile ? 'bottom' : 'top',
+        labels: { color: textColor, font: { family: 'DM Sans', size: isMobile ? 10 : 12 }, usePointStyle: true, pointStyleWidth: 8, boxHeight: 8 }
+      },
       tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} ${unit}` } }
     },
     scales: {
-      x: { grid: { color: gridColor }, ticks: { color: textColor, maxTicksLimit: 10, maxRotation: 45 } },
-      y: { grid: { color: gridColor }, ticks: { color: textColor }, beginAtZero: true, title: { display: true, text: yLabel, color: textColor, font: { size: 11 } } }
+      x: {
+        grid: { color: gridColor },
+        ticks: { color: textColor, maxTicksLimit: isMobile ? 6 : 10, maxRotation: 45, font: { size: isMobile ? 9 : 11 } }
+      },
+      y: {
+        grid: { color: gridColor },
+        ticks: { color: textColor, font: { size: isMobile ? 9 : 11 } },
+        beginAtZero: true,
+        title: { display: !isMobile, text: yLabel, color: textColor, font: { size: 11 } }
+      }
     }
   });
 
@@ -2119,9 +2132,24 @@ async function renderProgressCharts(challengeId) {
       borderWidth: 1,
     }));
 
+    const workoutOpts = {
+      ...chartOpts('Workouts', 'workouts'),
+      scales: {
+        ...chartOpts('Workouts', 'workouts').scales,
+        y: {
+          ...chartOpts('Workouts', 'workouts').scales.y,
+          ticks: {
+            color: textColor,
+            stepSize: 1,
+            precision: 0,
+            callback: val => Number.isInteger(val) ? val : null
+          }
+        }
+      }
+    };
     chartInstances.prog_workout = new Chart(
       document.getElementById('prog_workout').getContext('2d'),
-      { type: 'bar', data: { labels: weeks, datasets }, options: chartOpts('Workouts', 'workouts') }
+      { type: 'bar', data: { labels: weeks, datasets }, options: workoutOpts }
     );
   }
 

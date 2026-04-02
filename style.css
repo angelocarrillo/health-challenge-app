@@ -274,6 +274,9 @@ body {
   .analytics-tab-bar { display: none !important; }
   .analytics-tab-select { display: block !important; max-width: 100%; }
 
+  /* Charts — fixed height on mobile so data is visible */
+  .chart-card canvas { height: 260px !important; }
+
   /* Prevent horizontal scroll */
   body { overflow-x: hidden; }
   #appScreen { overflow-x: hidden; }
