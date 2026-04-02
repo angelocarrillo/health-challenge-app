@@ -107,6 +107,32 @@ function showPage(name) {
 document.querySelectorAll('.mobile-nav-item').forEach(btn => {
   btn.addEventListener('click', () => showPage(btn.dataset.page));
 });
+
+// Hide mobile nav on scroll down, show on scroll up
+(function() {
+  let lastScrollY = 0;
+  let ticking = false;
+  const nav = document.querySelector('.mobile-nav');
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        if (!nav) { ticking = false; return; }
+        const currentY = window.scrollY;
+        if (currentY > lastScrollY && currentY > 60) {
+          // Scrolling down — hide nav
+          nav.classList.add('hidden');
+        } else {
+          // Scrolling up — show nav
+          nav.classList.remove('hidden');
+        }
+        lastScrollY = currentY;
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+})();
 window.showPage = showPage;
 
 // ============================================================

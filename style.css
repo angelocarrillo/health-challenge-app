@@ -127,6 +127,10 @@ body {
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+}
+.mobile-nav.hidden {
+  transform: translateY(100%);
 }
 .mobile-nav-inner {
   display: grid;
