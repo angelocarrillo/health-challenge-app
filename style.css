@@ -990,8 +990,10 @@ select.input { cursor:pointer; }
 }
 .home-metric-pill:hover { border-color: var(--accent2); }
 
-/* Center metric sections on desktop */
-#homeMetricSections {
+/* Center metric sections and points preview on desktop */
+#homeMetricSections,
+#homePointsPreview,
+#homeLogContainer > div:last-child {
   max-width: 680px;
   margin-left: auto;
   margin-right: auto;
