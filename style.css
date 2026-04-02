@@ -140,7 +140,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   padding: 6px 4px;
   text-decoration: none;
   color: var(--text3);
@@ -156,9 +156,13 @@ body {
 .mobile-nav-item:hover,
 .mobile-nav-item.active { color: var(--accent); }
 .mobile-nav-icon {
-  font-size: 22px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   transition: transform var(--transition);
+  color: inherit; /* SVG strokes inherit the currentColor */
 }
 .mobile-nav-item.active .mobile-nav-icon { transform: translateY(-2px); }
 .mobile-nav-label { text-transform: uppercase; }
