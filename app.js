@@ -622,9 +622,39 @@ async function renderHomeMetricSections() {
     logState.entries  = {};
   }
 
+  // Fetch personal log for the selected date to pre-fill form
+  let homeExistingEntry = null;
+  try {
+    const personalDocId = `${currentUser.uid}_${dateStr}`;
+    const pSnap = await getDoc(doc(db, 'personalLogs', personalDocId));
+    if (pSnap.exists()) homeExistingEntry = pSnap.data();
+  } catch (err) { console.error('Personal log fetch error:', err); }
+
+  // Also check activity logs for this date as fallback
+  if (!homeExistingEntry && logState.entries[dateStr]) {
+    homeExistingEntry = logState.entries[dateStr];
+  }
+
+  // Restore workout type from existing entry
+  if (homeExistingEntry?.workout?.type) {
+    homeWorkoutType = homeExistingEntry.workout.type;
+    logState.workoutType = homeWorkoutType;
+  }
+
   sectionsEl.innerHTML = metricsToShow.map(m =>
-    renderMetricSection(m, repChallenge, dateStr, null, true)
+    renderMetricSection(m, repChallenge, dateStr, homeExistingEntry, true)
   ).join('');
+
+  // Pre-fill existing values if editing
+  if (homeExistingEntry) {
+    populateExistingEntry(homeExistingEntry, metricsToShow);
+  }
+
+  // Show existing entry note
+  const existingNote = document.getElementById('homeExistingNote');
+  if (existingNote) {
+    existingNote.textContent = homeExistingEntry ? '⚠️ Saving will replace your existing entry for this date' : '';
+  }
 
   // Attach listeners
   const inputIds = ['log_workout_done','log_steps','log_sleep','log_water','log_calories','log_protein','log_carbs','log_fat'];
@@ -722,7 +752,7 @@ function renderWeekPicker(direction = null) {
     el.addEventListener('click', async () => {
       if (!currentUser) return;
       document.getElementById('homeLogDate').value = el.dataset.date;
-      homeWorkoutType = null;
+      homeWorkoutType = null; // will be restored from existing entry if present
       logState.workoutType = null;
       renderWeekPicker();
       await renderHomeMetricSections();
@@ -803,7 +833,8 @@ document.getElementById('homeClearBtn')?.addEventListener('click', () => {
   homeWorkoutType = null;
   logState.workoutType = null;
   document.getElementById('homePointsPreview').style.display = 'none';
-  document.getElementById('homeExistingNote').textContent = '';
+  const note = document.getElementById('homeExistingNote');
+  if (note) note.textContent = '';
 });
 
 document.querySelectorAll('.home-metric-pill').forEach(pill => {
