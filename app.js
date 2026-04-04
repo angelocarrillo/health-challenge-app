@@ -2707,15 +2707,28 @@ async function renderPersonalCharts() {
     // ---- WORKOUT dotted line per week ----
     const hasWorkout = logs.some(l => l.workout?.done === 'yes');
     if (hasWorkout) {
-      // Aggregate by week
-      const weekMap = {};
+      // Get Sunday (start of week) for a given date
+      function getSundayOf(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        d.setDate(d.getDate() - d.getDay()); // subtract day-of-week (0=Sun)
+        return toDateStr(d);
+      }
+
+      // Aggregate by Sunday of each week
+      const weekMap = {}; // { 'YYYY-MM-DD': count }
       logs.forEach(l => {
-        const wk = `Week of ${new Date(l.date + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' })}`;
-        if (!weekMap[wk]) weekMap[wk] = 0;
-        if (l.workout?.done === 'yes') weekMap[wk]++;
+        const sunday = getSundayOf(l.date);
+        if (!weekMap[sunday]) weekMap[sunday] = 0;
+        if (l.workout?.done === 'yes') weekMap[sunday]++;
       });
-      const wkLabels = Object.keys(weekMap);
-      const wkData   = Object.values(weekMap);
+
+      // Sort weeks and format labels
+      const sortedWeeks = Object.keys(weekMap).sort();
+      const wkLabels = sortedWeeks.map(d => {
+        const dt = new Date(d + 'T00:00:00');
+        return `Week of ${dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      });
+      const wkData = sortedWeeks.map(d => weekMap[d]);
       const card = document.createElement('div');
       card.className = 'chart-card';
       card.style.marginBottom = '20px';
