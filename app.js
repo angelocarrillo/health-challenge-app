@@ -541,7 +541,7 @@ async function loadDashboard() {
 
     // Render metric pills
     renderHomeMetricPills();
-    renderHomeMetricSections();
+    await renderHomeMetricSections();
     updateHomeDateStatus();
 
   } catch (err) { console.error(err); }
@@ -554,7 +554,7 @@ function renderHomeMetricPills() {
   });
 }
 
-function renderHomeMetricSections() {
+async function renderHomeMetricSections() {
   const dateStr = document.getElementById('homeLogDate').value;
   if (!dateStr || homeChallenges.length === 0) return;
 
@@ -568,11 +568,31 @@ function renderHomeMetricSections() {
 
   const sectionsEl = document.getElementById('homeMetricSections');
 
-  // Use a representative challenge for goal display (first active one)
+  // Use first active challenge as representative for goal display
   const repChallenge = homeChallenges.find(c => new Date(c.endDate) >= new Date()) || homeChallenges[0];
 
-  // Temporarily load entries for the selected date across all challenges
-  // We use a simplified render — goals shown from representative challenge
+  // ---- Load logState fully for the rep challenge so calcPointsForEntry is accurate ----
+  logState.challenge   = repChallenge;
+  logState.workoutType = homeWorkoutType;
+
+  // Load baseline for dynamic challenges
+  if (repChallenge.mode === 'dynamic') {
+    const bSnap = await getDoc(doc(db, 'challenges', repChallenge.id, 'baselines', currentUser.uid));
+    logState.baseline = bSnap.exists() ? bSnap.data() : null;
+  } else {
+    logState.baseline = null;
+  }
+
+  // Load existing entries for weekly cap calculation
+  const eSnap = await getDocs(query(
+    collection(db, 'activityLogs'),
+    where('challengeId', '==', repChallenge.id),
+    where('userId', '==', currentUser.uid)
+  ));
+  logState.entries = {};
+  eSnap.forEach(d => { logState.entries[d.data().date] = { id: d.id, ...d.data() }; });
+  // ---------------------------------------------------------------------------------
+
   sectionsEl.innerHTML = metricsToShow.map(m =>
     renderMetricSection(m, repChallenge, dateStr, null, true)
   ).join('');
@@ -654,7 +674,7 @@ document.querySelectorAll('.home-metric-pill').forEach(pill => {
     pill.classList.toggle('active');
     homeVisibleMetrics = [...document.querySelectorAll('.home-metric-pill.active')].map(p => p.dataset.metric);
     localStorage.setItem('fw-home-metrics', JSON.stringify(homeVisibleMetrics));
-    renderHomeMetricSections();
+    await renderHomeMetricSections();
   });
 });
 
