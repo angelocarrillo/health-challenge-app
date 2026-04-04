@@ -1629,7 +1629,8 @@ function renderMetricSection(metric, challenge, dateStr, existing, hideIcon = fa
   // For workouts, also show how many have been logged this week vs cap
   if (metric === 'workout' && goal) {
     const weeklyGoal   = goal;
-    const alreadyDone  = getWorkoutsThisWeek(dateStr, challenge, dateStr);
+    // Don't exclude the current date — show true total workouts done this week
+    const alreadyDone  = getWorkoutsThisWeek(dateStr, challenge, null);
     const ptsPerWkt    = challenge.mode === 'dynamic'
       ? Math.round((10 / weeklyGoal) * 100) / 100
       : (challenge.classicPoints?.workout ?? 2);
