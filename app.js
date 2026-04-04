@@ -663,6 +663,13 @@ function updateHomePointsPreview(metrics, challenge, dateStr) {
 // Wire up home page controls
 document.getElementById('homeLogDate')?.addEventListener('change', async () => {
   if (!currentUser) return;
+  // Prevent future dates on mobile (native picker may ignore max attribute)
+  const today   = toDateStr(new Date());
+  const dateEl  = document.getElementById('homeLogDate');
+  if (dateEl.value > today) {
+    dateEl.value = today;
+    return;
+  }
   homeWorkoutType = null;
   logState.workoutType = null;
   updateHomeDateStatus();
