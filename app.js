@@ -701,10 +701,11 @@ function renderWeekPicker() {
 
     html += `
       <div class="${cls}" data-date="${dateStr}">
-        <span class="week-day-label">${DAY_LETTERS[i]}</span>
+        <div class="week-day-today-dot"></div>
         <div class="week-day-circle">
           <span class="week-day-num">${d.getDate()}</span>
         </div>
+        <span class="week-day-label">${DAY_LETTERS[i]}</span>
       </div>`;
   }
 

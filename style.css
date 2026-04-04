@@ -673,6 +673,17 @@ select.input { cursor:pointer; }
   letter-spacing: 0.05em;
 }
 
+/* Today dot — shown above circle only for today */
+.week-day-today-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: transparent;
+  flex-shrink: 0;
+}
+.week-day.is-today .week-day-today-dot {
+  background: var(--accent);
+}
+
 .week-day-circle {
   position: relative;
   width: 38px; height: 38px;
@@ -693,10 +704,7 @@ select.input { cursor:pointer; }
   z-index: 1;
 }
 
-/* Today — double ring */
-.week-day.is-today .week-day-circle {
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
-}
+/* Today — label accent, num slightly brighter */
 .week-day.is-today .week-day-label { color: var(--accent); }
 .week-day.is-today .week-day-num { opacity: 0.8; color: var(--text); }
 
@@ -705,34 +713,25 @@ select.input { cursor:pointer; }
   background: var(--accent);
   border-color: var(--accent);
 }
-.week-day.has-activity .week-day-num {
-  color: #000;
-  opacity: 1;
-}
+.week-day.has-activity .week-day-num { color: #000; opacity: 1; }
 
-/* Selected day */
+/* Selected — ring instead of fill */
 .week-day.selected .week-day-circle {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
   border-color: var(--accent);
-  background: rgba(0,229,160,0.12);
 }
-.week-day.selected .week-day-num {
-  color: var(--accent);
-  opacity: 1;
-}
+.week-day.selected .week-day-num { color: var(--accent); opacity: 1; }
 
-/* Selected + has activity */
+/* Selected + has activity — ring over filled circle */
 .week-day.selected.has-activity .week-day-circle {
   background: var(--accent);
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0,229,160,0.3);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 }
 .week-day.selected.has-activity .week-day-num { color: #000; opacity: 1; }
 
 /* Future days — dimmed */
-.week-day.is-future {
-  pointer-events: none;
-  opacity: 0.35;
-}
+.week-day.is-future { pointer-events: none; opacity: 0.35; }
 
 @media (max-width: 768px) {
   .week-nav-btn { display: none; } /* hidden on mobile — swipe instead */
