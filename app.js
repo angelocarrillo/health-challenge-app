@@ -753,7 +753,7 @@ document.getElementById('weekDays')?.addEventListener('touchstart', e => {
 
 document.getElementById('weekDays')?.addEventListener('touchend', e => {
   const dx = e.changedTouches[0].clientX - weekPickerTouchStartX;
-  if (Math.abs(dx) < 40) return;
+  if (Math.abs(dx) < 60) return;
   if (dx < 0) {
     // Swipe left — go forward in time (slide in from left)
     if (weekPickerOffset < 0) { weekPickerOffset++; renderWeekPicker('left'); }

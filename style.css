@@ -657,15 +657,15 @@ select.input { cursor:pointer; }
 }
 
 @keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-40px); }
+  from { opacity: 0; transform: translateX(-60px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(40px); }
+  from { opacity: 0; transform: translateX(60px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-.week-days.animate-left  { animation: slideInLeft  0.25s cubic-bezier(.4,0,.2,1) both; }
-.week-days.animate-right { animation: slideInRight 0.25s cubic-bezier(.4,0,.2,1) both; }
+.week-days.animate-left  { animation: slideInLeft  0.3s cubic-bezier(.4,0,.2,1) both; }
+.week-days.animate-right { animation: slideInRight 0.3s cubic-bezier(.4,0,.2,1) both; }
 
 .week-day {
   display: flex;
