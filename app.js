@@ -658,7 +658,7 @@ function getSundayOfWeek(offset = 0) {
   return now;
 }
 
-function renderWeekPicker() {
+function renderWeekPicker(direction = null) {
   const container = document.getElementById('weekDays');
   if (!container) return; // not on home page yet
   const today     = toDateStr(new Date());
@@ -709,7 +709,13 @@ function renderWeekPicker() {
       </div>`;
   }
 
+  // Remove any existing animation class before re-adding
+  container.classList.remove('animate-left', 'animate-right');
+  // Force reflow so animation restarts
+  void container.offsetWidth;
   container.innerHTML = html;
+  if (direction === 'left')  container.classList.add('animate-left');
+  if (direction === 'right') container.classList.add('animate-right');
 
   // Click handlers
   container.querySelectorAll('.week-day:not(.is-future)').forEach(el => {
@@ -732,12 +738,12 @@ function renderWeekPicker() {
 // Nav buttons
 document.getElementById('weekPrev')?.addEventListener('click', () => {
   weekPickerOffset--;
-  renderWeekPicker();
+  renderWeekPicker('right'); // going back = new week slides in from right
 });
 document.getElementById('weekNext')?.addEventListener('click', () => {
   if (weekPickerOffset >= 0) return;
   weekPickerOffset++;
-  renderWeekPicker();
+  renderWeekPicker('left'); // going forward = new week slides in from left
 });
 
 // Swipe left/right on the week picker
@@ -749,12 +755,12 @@ document.getElementById('weekDays')?.addEventListener('touchend', e => {
   const dx = e.changedTouches[0].clientX - weekPickerTouchStartX;
   if (Math.abs(dx) < 40) return;
   if (dx < 0) {
-    // Swipe left — go to next week (only if not already current week)
-    if (weekPickerOffset < 0) { weekPickerOffset++; renderWeekPicker(); }
+    // Swipe left — go forward in time (slide in from left)
+    if (weekPickerOffset < 0) { weekPickerOffset++; renderWeekPicker('left'); }
   } else {
-    // Swipe right — go to previous week
+    // Swipe right — go back in time (slide in from right)
     weekPickerOffset--;
-    renderWeekPicker();
+    renderWeekPicker('right');
   }
 }, { passive: true });
 
