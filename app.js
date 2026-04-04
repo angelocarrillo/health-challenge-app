@@ -2013,7 +2013,7 @@ document.getElementById('analyticsChallengeSelect').addEventListener('change', a
   const container = document.getElementById('analyticsContainer');
   if (!cid) { container.style.display = 'none'; return; }
   container.style.display = 'block';
-  const activeTab = document.querySelector('[data-atab].active')?.dataset.atab || 'leaderboard';
+  const activeTab = document.querySelector('[data-atab].active')?.dataset.atab || 'personal';
   await renderAnalyticsTab(activeTab, cid);
 });
 
@@ -2021,6 +2021,10 @@ async function populateAnalyticsSelector() {
   const select = document.getElementById('analyticsChallengeSelect');
   const prev   = select.value;
   select.innerHTML = '<option value="">— Choose a challenge —</option>';
+
+  // Always render personal tab immediately — doesn't need a challenge
+  document.getElementById('analyticsContainer').style.display = 'block';
+  await renderPersonalCharts();
   const allSnap = await getDocs(collection(db, 'challenges'));
   const now = new Date();
   const activeOpts = [], endedOpts = [];
@@ -2054,7 +2058,7 @@ async function populateAnalyticsSelector() {
   if (prev && [...select.options].some(o => o.value === prev)) {
     select.value = prev;
     document.getElementById('analyticsContainer').style.display = 'block';
-    const activeTab = document.querySelector('[data-atab].active')?.dataset.atab || 'leaderboard';
+    const activeTab = document.querySelector('[data-atab].active')?.dataset.atab || 'personal';
     await renderAnalyticsTab(activeTab, prev);
   }
 }

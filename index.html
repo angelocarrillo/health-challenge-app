@@ -195,12 +195,12 @@
       <div id="analyticsContainer" style="display:none;">
         <!-- View toggle -->
         <div class="tab-bar analytics-tab-bar" style="margin-bottom:28px;">
-          <button class="tab active" data-atab="leaderboard">🏅 Leaderboard</button>
+          <button class="tab" data-atab="leaderboard">🏅 Leaderboard</button>
           <button class="tab" data-atab="progress">📈 Progress</button>
           <button class="tab" data-atab="group">👥 Group</button>
           <button class="tab" data-atab="breakdown">💪 Breakdown</button>
           <button class="tab" data-atab="history">🕘 History</button>
-          <button class="tab" data-atab="personal">👤 Personal</button>
+          <button class="tab active" data-atab="personal">👤 Personal</button>
         </div>
         <!-- Mobile dropdown version of analytics tabs -->
         <select id="analyticsTabSelect" class="input analytics-tab-select" style="display:none;margin-bottom:28px;">
@@ -209,11 +209,11 @@
           <option value="group">👥 Group</option>
           <option value="breakdown">💪 Breakdown</option>
           <option value="history">🕘 History</option>
-          <option value="personal">👤 Personal</option>
+          <option value="personal" selected>👤 Personal</option>
         </select>
 
         <!-- LEADERBOARD -->
-        <div id="atab-leaderboard" class="atab-content active">
+        <div id="atab-leaderboard" class="atab-content">
           <div id="leaderboardContent"></div>
         </div>
 
@@ -249,7 +249,7 @@
         </div>
 
         <!-- PERSONAL -->
-        <div id="atab-personal" class="atab-content">
+        <div id="atab-personal" class="atab-content active">
           <div style="margin-bottom:20px;">
             <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">
               Your personal health trends across all time — independent of any challenge.
