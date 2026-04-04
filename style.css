@@ -972,9 +972,10 @@ select.input { cursor:pointer; }
 .home-log-date-row .form-group {
   margin: 0;
   text-align: center;
-  min-width: 220px;
+  width: 100%;
+  max-width: 280px;
 }
-#homeLogDate { max-width: 220px; text-align: center; }
+#homeLogDate { width: 100%; text-align: center; }
 
 /* Metric pill toggles */
 .home-metric-toggles {

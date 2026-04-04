@@ -1516,7 +1516,7 @@ function renderMetricSection(metric, challenge, dateStr, existing, hideIcon = fa
         </div>
       </div>
       <div class="log-input-row">
-        <label>Did you complete a workout today?</label>
+        <label>Did you complete a workout?</label>
         <select id="log_workout_done" class="input" style="max-width:140px;">
           <option value="">Select</option>
           <option value="yes">✅ Yes</option>
@@ -1526,22 +1526,22 @@ function renderMetricSection(metric, challenge, dateStr, existing, hideIcon = fa
   } else if (metric === 'steps') {
     body = `
       <div class="log-input-row">
-        <label>Step count today</label>
-        <input type="number" id="log_steps" class="input" placeholder="e.g. 8500" min="0" max="100000"/>
+        <label>Step Count</label>
+        <input type="number" id="log_steps" class="input" placeholder="e.g. 8500" min="0" max="100000" inputmode="numeric" pattern="[0-9]*"/>
         <span class="log-input-unit">steps</span>
       </div>`;
   } else if (metric === 'sleep') {
     body = `
       <div class="log-input-row">
-        <label>Hours of sleep last night</label>
-        <input type="number" id="log_sleep" class="input" placeholder="e.g. 7" min="0" max="24" step="0.5"/>
+        <label>Hours of Sleep</label>
+        <input type="number" id="log_sleep" class="input" placeholder="e.g. 7" min="0" max="24" step="0.5" inputmode="decimal" pattern="[0-9]*"/>
         <span class="log-input-unit">hours</span>
       </div>`;
   } else if (metric === 'water') {
     body = `
       <div class="log-input-row">
-        <label>Cups of water today</label>
-        <input type="number" id="log_water" class="input" placeholder="e.g. 10" min="0" max="50"/>
+        <label>Cups of Water</label>
+        <input type="number" id="log_water" class="input" placeholder="e.g. 10" min="0" max="50" inputmode="numeric" pattern="[0-9]*"/>
         <span class="log-input-unit">cups</span>
       </div>`;
   } else if (metric === 'macros') {
@@ -1550,19 +1550,19 @@ function renderMetricSection(metric, challenge, dateStr, existing, hideIcon = fa
       <div class="macro-grid">
         <div class="macro-field">
           <label>Calories</label>
-          <input type="number" id="log_calories" class="input" placeholder="e.g. 2000" min="0"/>
+          <input type="number" id="log_calories" class="input" placeholder="e.g. 2000" min="0" inputmode="numeric" pattern="[0-9]*"/>
         </div>
         <div class="macro-field">
           <label>Protein (g)</label>
-          <input type="number" id="log_protein" class="input" placeholder="e.g. 150" min="0"/>
+          <input type="number" id="log_protein" class="input" placeholder="e.g. 150" min="0" inputmode="numeric" pattern="[0-9]*"/>
         </div>
         <div class="macro-field">
           <label>Carbs (g)</label>
-          <input type="number" id="log_carbs" class="input" placeholder="e.g. 200" min="0"/>
+          <input type="number" id="log_carbs" class="input" placeholder="e.g. 200" min="0" inputmode="numeric" pattern="[0-9]*"/>
         </div>
         <div class="macro-field">
           <label>Fat (g)</label>
-          <input type="number" id="log_fat" class="input" placeholder="e.g. 70" min="0"/>
+          <input type="number" id="log_fat" class="input" placeholder="e.g. 70" min="0" inputmode="numeric" pattern="[0-9]*"/>
         </div>
       </div>`;
   }
