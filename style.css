@@ -294,9 +294,9 @@ body {
   .page { overflow-x: hidden; }
   #logFormContainer { overflow-x: hidden; width: 100%; }
   #homeLogContainer { width: 100%; }
-  .home-log-date-row,
-  .home-log-date-row .form-group,
-  #homeLogDate { width: 100% !important; max-width: 100% !important; }
+  .home-log-date-row { width: 100%; }
+  .home-log-date-row .form-group { width: 100%; max-width: 100%; }
+  #homeLogDate { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
 }
 
 /* ---- PAGES ---- */
@@ -972,15 +972,14 @@ select.input { cursor:pointer; }
   display: flex;
   justify-content: center;
   margin-bottom: 24px;
-  width: 100%;
 }
 .home-log-date-row .form-group {
   margin: 0;
   text-align: center;
-  width: 100%;
+  width: 260px;
 }
 #homeLogDate {
-  width: 100%;
+  width: 260px;
   text-align: center;
   display: block;
   box-sizing: border-box;
