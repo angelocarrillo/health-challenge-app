@@ -561,13 +561,8 @@ async function renderHomeMetricSections() {
   const dateStr = document.getElementById('homeLogDate')?.value;
   if (!dateStr) return;
 
-  // Union of all metrics across all challenges
-  const allActiveMetrics = [...new Set(
-    homeChallenges.flatMap(c => c.metrics || ['workout','steps'])
-  )];
-
-  // Filter to what user wants to see, and what at least one challenge tracks
-  const metricsToShow = homeVisibleMetrics.filter(m => allActiveMetrics.includes(m));
+  // Always show all 5 metrics on home page — user can track anything regardless of challenge
+  const metricsToShow = homeVisibleMetrics.length > 0 ? homeVisibleMetrics : ALL_METRICS;
 
   const sectionsEl = document.getElementById('homeMetricSections');
   if (!sectionsEl) return;
@@ -789,6 +784,35 @@ async function saveHomeLog() {
         results.push({ name: c.name, pts: total, skipped: false });
       }
     }
+
+    // Save personal log entry (always, for all 5 metrics regardless of challenge)
+    try {
+      const personalEntry = {
+        userId:    currentUser.uid,
+        date:      dateStr,
+        updatedAt: serverTimestamp(),
+      };
+      const workoutDone = document.getElementById('log_workout_done')?.value;
+      personalEntry.workout  = { done: workoutDone || 'no', type: homeWorkoutType || null };
+      personalEntry.steps    = parseInt(document.getElementById('log_steps')?.value)   || null;
+      personalEntry.sleep    = parseFloat(document.getElementById('log_sleep')?.value) || null;
+      personalEntry.water    = parseInt(document.getElementById('log_water')?.value)   || null;
+      personalEntry.macros   = {
+        calories: parseInt(document.getElementById('log_calories')?.value) || null,
+        protein:  parseInt(document.getElementById('log_protein')?.value)  || null,
+        carbs:    parseInt(document.getElementById('log_carbs')?.value)    || null,
+        fat:      parseInt(document.getElementById('log_fat')?.value)      || null,
+      };
+      const personalDocId = `${currentUser.uid}_${dateStr}`;
+      const hasPersonalData = (workoutDone && workoutDone !== 'no') ||
+        personalEntry.steps || personalEntry.sleep || personalEntry.water ||
+        personalEntry.macros.calories || personalEntry.macros.protein;
+      if (hasPersonalData) {
+        await setDoc(doc(db, 'personalLogs', personalDocId), personalEntry);
+      } else {
+        await deleteDoc(doc(db, 'personalLogs', personalDocId)).catch(() => {});
+      }
+    } catch (err) { console.error('Personal log save error:', err); }
 
     // Show confirmation modal
     showSaveConfirmModal(results);
@@ -2041,6 +2065,7 @@ async function renderAnalyticsTab(tab, challengeId) {
   if (tab === 'group')       await renderGroupCharts(challengeId);
   if (tab === 'breakdown')   await renderBreakdown(challengeId, document.querySelector('#breakdownToggle .atoggle-btn.active')?.dataset.view || 'me');
   if (tab === 'history')     await renderHistory();
+  if (tab === 'personal')    await renderPersonalCharts();
 }
 
 // ---- DATA FETCHER ----
@@ -2582,5 +2607,191 @@ async function renderHistory() {
   } catch (err) {
     console.error(err);
     el.innerHTML = '<div class="empty-state"><span>⚠️</span><p>Failed to load history.</p></div>';
+  }
+}
+
+// ============================================================
+//  PERSONAL ANALYTICS — Individual Health Trends
+// ============================================================
+
+// Set default date range on personal tab (last 30 days)
+function initPersonalDateRange() {
+  const to   = toDateStr(new Date());
+  const from = toDateStr(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const fromEl = document.getElementById('personalDateFrom');
+  const toEl   = document.getElementById('personalDateTo');
+  if (fromEl && !fromEl.value) fromEl.value = from;
+  if (toEl   && !toEl.value)   toEl.value   = to;
+}
+
+document.getElementById('personalRefreshBtn')?.addEventListener('click', () => renderPersonalCharts());
+
+async function renderPersonalCharts() {
+  if (!currentUser) return;
+  initPersonalDateRange();
+
+  const fromStr = document.getElementById('personalDateFrom')?.value;
+  const toStr   = document.getElementById('personalDateTo')?.value;
+  const container = document.getElementById('personalChartsContainer');
+  if (!container) return;
+
+  // Destroy old personal charts
+  Object.keys(chartInstances).filter(k => k.startsWith('pers_')).forEach(k => destroyChart(k));
+  container.innerHTML = '<div style="color:var(--text2);padding:20px;">Loading...</div>';
+
+  try {
+    // Fetch personal logs in date range
+    const snap = await getDocs(query(
+      collection(db, 'personalLogs'),
+      where('userId', '==', currentUser.uid)
+    ));
+
+    const logs = [];
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.date >= fromStr && data.date <= toStr) logs.push(data);
+    });
+    logs.sort((a, b) => a.date.localeCompare(b.date));
+
+    if (logs.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <span>📈</span>
+          <p>No personal data logged in this date range.<br/>Start logging from the Home page!</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = '';
+    const dates    = logs.map(l => l.date);
+    const isDark   = document.documentElement.getAttribute('data-theme') === 'dark';
+    const gridClr  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const textClr  = isDark ? '#8b90a8' : '#5a6070';
+    const isMobile = window.innerWidth <= 768;
+
+    const baseOpts = (yLabel) => ({
+      responsive: true,
+      maintainAspectRatio: !isMobile,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { title: ctx => ctx[0].label, label: ctx => `${ctx.parsed.y} ${yLabel}` } }
+      },
+      scales: {
+        x: { grid: { color: gridClr }, ticks: { color: textClr, maxTicksLimit: isMobile ? 6 : 12, maxRotation: 45, font: { size: isMobile ? 9 : 11 } } },
+        y: { grid: { color: gridClr }, ticks: { color: textClr, font: { size: isMobile ? 9 : 11 } }, beginAtZero: true,
+             title: { display: !isMobile, text: yLabel, color: textClr, font: { size: 11 } } }
+      }
+    });
+
+    const dottedDataset = (data, color, label) => ({
+      label, data,
+      borderColor: color, backgroundColor: 'transparent',
+      borderWidth: 2, borderDash: [4, 4],
+      pointRadius: 3, pointBackgroundColor: color,
+      tension: 0.3, spanGaps: false,
+    });
+
+    const addChart = (id, title, type, datasets, opts) => {
+      const card = document.createElement('div');
+      card.className = 'chart-card';
+      card.style.marginBottom = '20px';
+      card.innerHTML = `<div class="chart-title">${title}</div><canvas id="${id}" height="100"></canvas>`;
+      container.appendChild(card);
+      chartInstances[id] = new Chart(document.getElementById(id).getContext('2d'), { type, data: { labels: dates, datasets }, options: opts });
+    };
+
+    // ---- WORKOUT dotted line per week ----
+    const hasWorkout = logs.some(l => l.workout?.done === 'yes');
+    if (hasWorkout) {
+      // Aggregate by week
+      const weekMap = {};
+      logs.forEach(l => {
+        const wk = `Week of ${new Date(l.date + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' })}`;
+        if (!weekMap[wk]) weekMap[wk] = 0;
+        if (l.workout?.done === 'yes') weekMap[wk]++;
+      });
+      const wkLabels = Object.keys(weekMap);
+      const wkData   = Object.values(weekMap);
+      const card = document.createElement('div');
+      card.className = 'chart-card';
+      card.style.marginBottom = '20px';
+      card.innerHTML = `<div class="chart-title">💪 Workouts Per Week</div><canvas id="pers_workout" height="100"></canvas>`;
+      container.appendChild(card);
+      const wkOpts = {
+        ...baseOpts('Workouts'),
+        scales: { ...baseOpts('Workouts').scales,
+          y: { ...baseOpts('Workouts').scales.y,
+            ticks: { ...baseOpts('Workouts').scales.y.ticks, stepSize: 1, precision: 0, callback: v => Number.isInteger(v) ? v : null }
+          }
+        }
+      };
+      chartInstances.pers_workout = new Chart(
+        document.getElementById('pers_workout').getContext('2d'),
+        { type: 'line', data: { labels: wkLabels, datasets: [dottedDataset(wkData, '#00e5a0', 'Workouts')] }, options: wkOpts }
+      );
+    }
+
+    // ---- STEPS dotted line ----
+    const stepsData = logs.map(l => l.steps ?? null);
+    if (stepsData.some(v => v !== null)) {
+      addChart('pers_steps', '👟 Steps Per Day', 'line',
+        [dottedDataset(stepsData, '#7c6dfa', 'Steps')], baseOpts('Steps'));
+    }
+
+    // ---- SLEEP dotted line ----
+    const sleepData = logs.map(l => l.sleep ?? null);
+    if (sleepData.some(v => v !== null)) {
+      addChart('pers_sleep', '😴 Sleep Per Night', 'line',
+        [dottedDataset(sleepData, '#38bdf8', 'Hours')], baseOpts('Hours'));
+    }
+
+    // ---- WATER dotted line ----
+    const waterData = logs.map(l => l.water ?? null);
+    if (waterData.some(v => v !== null)) {
+      addChart('pers_water', '💧 Water Per Day', 'line',
+        [dottedDataset(waterData, '#00e5a0', 'Cups')], baseOpts('Cups'));
+    }
+
+    // ---- MACROS — 3 lines: Protein (pinkish-red), Carbs (yellow-orange), Fat (blue) ----
+    const proteinData = logs.map(l => l.macros?.protein ?? null);
+    const carbsData   = logs.map(l => l.macros?.carbs   ?? null);
+    const fatData     = logs.map(l => l.macros?.fat      ?? null);
+    if ([...proteinData, ...carbsData, ...fatData].some(v => v !== null)) {
+      const card = document.createElement('div');
+      card.className = 'chart-card';
+      card.style.marginBottom = '20px';
+      card.innerHTML = `<div class="chart-title">🥗 Macros Per Day (grams)</div><canvas id="pers_macros" height="100"></canvas>`;
+      container.appendChild(card);
+      const macroOpts = {
+        ...baseOpts('Grams'),
+        plugins: {
+          ...baseOpts('Grams').plugins,
+          legend: { display: true, labels: { color: textClr, font: { family: 'DM Sans', size: isMobile ? 10 : 12 }, usePointStyle: true, pointStyleWidth: 8 } }
+        }
+      };
+      chartInstances.pers_macros = new Chart(
+        document.getElementById('pers_macros').getContext('2d'),
+        {
+          type: 'line',
+          data: {
+            labels: dates,
+            datasets: [
+              dottedDataset(proteinData, '#f472b6', 'Protein'),   // pinkish-red
+              dottedDataset(carbsData,   '#ffb347', 'Carbs'),     // yellowish-orange
+              dottedDataset(fatData,     '#60a5fa', 'Fat'),       // blue
+            ]
+          },
+          options: macroOpts
+        }
+      );
+    }
+
+    if (container.children.length === 0) {
+      container.innerHTML = `<div class="empty-state"><span>📊</span><p>No data to chart in this range yet.</p></div>`;
+    }
+
+  } catch (err) {
+    console.error('Personal charts error:', err);
+    container.innerHTML = '<div class="empty-state"><span>⚠️</span><p>Failed to load personal data.</p></div>';
   }
 }

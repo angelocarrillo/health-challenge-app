@@ -200,6 +200,7 @@
           <button class="tab" data-atab="group">👥 Group</button>
           <button class="tab" data-atab="breakdown">💪 Breakdown</button>
           <button class="tab" data-atab="history">🕘 History</button>
+          <button class="tab" data-atab="personal">👤 Personal</button>
         </div>
         <!-- Mobile dropdown version of analytics tabs -->
         <select id="analyticsTabSelect" class="input analytics-tab-select" style="display:none;margin-bottom:28px;">
@@ -208,6 +209,7 @@
           <option value="group">👥 Group</option>
           <option value="breakdown">💪 Breakdown</option>
           <option value="history">🕘 History</option>
+          <option value="personal">👤 Personal</option>
         </select>
 
         <!-- LEADERBOARD -->
@@ -244,6 +246,27 @@
         <!-- HISTORY -->
         <div id="atab-history" class="atab-content">
           <div id="historyContent"></div>
+        </div>
+
+        <!-- PERSONAL -->
+        <div id="atab-personal" class="atab-content">
+          <div style="margin-bottom:20px;">
+            <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">
+              Your personal health trends across all time — independent of any challenge.
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+              <div class="form-group" style="margin:0;">
+                <label>From</label>
+                <input type="date" id="personalDateFrom" class="input" style="max-width:160px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>To</label>
+                <input type="date" id="personalDateTo" class="input" style="max-width:160px;"/>
+              </div>
+              <button class="btn-primary" id="personalRefreshBtn" style="margin-top:18px;">Apply</button>
+            </div>
+          </div>
+          <div id="personalChartsContainer"></div>
         </div>
 
       </div>
