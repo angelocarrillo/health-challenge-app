@@ -2826,7 +2826,9 @@ async function renderPersonalCharts() {
     }
 
     container.innerHTML = '';
-    const dates    = logs.map(l => l.date);
+    // Format dates without year for x-axis labels (e.g. "Apr 3" instead of "4/3/2026")
+    const formatDateLabel = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const dates    = logs.map(l => formatDateLabel(l.date));
     const isDark   = document.documentElement.getAttribute('data-theme') === 'dark';
     const gridClr  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
     const textClr  = isDark ? '#8b90a8' : '#5a6070';
