@@ -555,8 +555,11 @@ function renderHomeMetricPills() {
 }
 
 async function renderHomeMetricSections() {
-  const dateStr = document.getElementById('homeLogDate').value;
-  if (!dateStr || homeChallenges.length === 0) return;
+  // Guard: don't run if not logged in or no challenges loaded
+  if (!currentUser || homeChallenges.length === 0) return;
+
+  const dateStr = document.getElementById('homeLogDate')?.value;
+  if (!dateStr) return;
 
   // Union of all metrics across all challenges
   const allActiveMetrics = [...new Set(
@@ -567,31 +570,37 @@ async function renderHomeMetricSections() {
   const metricsToShow = homeVisibleMetrics.filter(m => allActiveMetrics.includes(m));
 
   const sectionsEl = document.getElementById('homeMetricSections');
+  if (!sectionsEl) return;
 
   // Use first active challenge as representative for goal display
   const repChallenge = homeChallenges.find(c => new Date(c.endDate) >= new Date()) || homeChallenges[0];
 
-  // ---- Load logState fully for the rep challenge so calcPointsForEntry is accurate ----
-  logState.challenge   = repChallenge;
-  logState.workoutType = homeWorkoutType;
+  try {
+    // Load logState fully for the rep challenge so calcPointsForEntry is accurate
+    logState.challenge   = repChallenge;
+    logState.workoutType = homeWorkoutType;
 
-  // Load baseline for dynamic challenges
-  if (repChallenge.mode === 'dynamic') {
-    const bSnap = await getDoc(doc(db, 'challenges', repChallenge.id, 'baselines', currentUser.uid));
-    logState.baseline = bSnap.exists() ? bSnap.data() : null;
-  } else {
+    // Load baseline for dynamic challenges
+    if (repChallenge.mode === 'dynamic') {
+      const bSnap = await getDoc(doc(db, 'challenges', repChallenge.id, 'baselines', currentUser.uid));
+      logState.baseline = bSnap.exists() ? bSnap.data() : null;
+    } else {
+      logState.baseline = null;
+    }
+
+    // Load existing entries for weekly cap calculation
+    const eSnap = await getDocs(query(
+      collection(db, 'activityLogs'),
+      where('challengeId', '==', repChallenge.id),
+      where('userId', '==', currentUser.uid)
+    ));
+    logState.entries = {};
+    eSnap.forEach(d => { logState.entries[d.data().date] = { id: d.id, ...d.data() }; });
+  } catch (err) {
+    console.error('Home metric sections load error:', err);
     logState.baseline = null;
+    logState.entries  = {};
   }
-
-  // Load existing entries for weekly cap calculation
-  const eSnap = await getDocs(query(
-    collection(db, 'activityLogs'),
-    where('challengeId', '==', repChallenge.id),
-    where('userId', '==', currentUser.uid)
-  ));
-  logState.entries = {};
-  eSnap.forEach(d => { logState.entries[d.data().date] = { id: d.id, ...d.data() }; });
-  // ---------------------------------------------------------------------------------
 
   sectionsEl.innerHTML = metricsToShow.map(m =>
     renderMetricSection(m, repChallenge, dateStr, null, true)
@@ -652,11 +661,12 @@ function updateHomePointsPreview(metrics, challenge, dateStr) {
 }
 
 // Wire up home page controls
-document.getElementById('homeLogDate')?.addEventListener('change', () => {
+document.getElementById('homeLogDate')?.addEventListener('change', async () => {
+  if (!currentUser) return;
   homeWorkoutType = null;
   logState.workoutType = null;
   updateHomeDateStatus();
-  renderHomeMetricSections();
+  await renderHomeMetricSections();
 });
 
 document.getElementById('homeClearBtn')?.addEventListener('click', () => {
@@ -670,7 +680,8 @@ document.getElementById('homeClearBtn')?.addEventListener('click', () => {
 });
 
 document.querySelectorAll('.home-metric-pill').forEach(pill => {
-  pill.addEventListener('click', () => {
+  pill.addEventListener('click', async () => {
+    if (!currentUser) return;
     pill.classList.toggle('active');
     homeVisibleMetrics = [...document.querySelectorAll('.home-metric-pill.active')].map(p => p.dataset.metric);
     localStorage.setItem('fw-home-metrics', JSON.stringify(homeVisibleMetrics));
