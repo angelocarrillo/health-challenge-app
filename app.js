@@ -565,10 +565,14 @@ async function loadDashboard() {
     if (!homeDate.value) homeDate.value = today;
     homeDate.max = today;
 
-    // Render metric pills
+    // Set today as selected date
+    const homeDate = document.getElementById('homeLogDate');
+    if (!homeDate.value) homeDate.value = today;
+
+    // Render metric pills and week picker
     renderHomeMetricPills();
+    renderWeekPicker();
     await renderHomeMetricSections();
-    updateHomeDateStatus();
 
   } catch (err) { console.error(err); }
 }
@@ -645,15 +649,121 @@ async function renderHomeMetricSections() {
   });
 }
 
+// ============================================================
+//  WEEK PICKER
+// ============================================================
+let weekPickerOffset = 0; // weeks offset from current week (0 = this week)
+let weekPickerTouchStartX = 0;
+
+function getSundayOfWeek(offset = 0) {
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  const day = now.getDay(); // 0=Sun
+  now.setDate(now.getDate() - day + offset * 7);
+  return now;
+}
+
+function renderWeekPicker() {
+  const today     = toDateStr(new Date());
+  const selected  = document.getElementById('homeLogDate').value || today;
+  const sunday    = getSundayOfWeek(weekPickerOffset);
+  const container = document.getElementById('weekDays');
+  if (!container) return;
+
+  // Get logged dates from home challenges for highlighting
+  const loggedDates = new Set();
+  if (logState.entries) {
+    Object.keys(logState.entries).forEach(d => {
+      const e = logState.entries[d];
+      const hasData = e && (
+        e.workout?.done === 'yes' ||
+        (e.steps  != null && e.steps  > 0) ||
+        (e.sleep  != null && e.sleep  > 0) ||
+        (e.water  != null && e.water  > 0) ||
+        (e.macros?.calories != null && e.macros.calories > 0)
+      );
+      if (hasData) loggedDates.add(d);
+    });
+  }
+
+  const DAY_LETTERS = ['S','M','T','W','T','F','S'];
+  let html = '';
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sunday);
+    d.setDate(d.getDate() + i);
+    const dateStr    = toDateStr(d);
+    const isToday    = dateStr === today;
+    const isFuture   = dateStr > today;
+    const isSelected = dateStr === selected;
+    const hasAct     = loggedDates.has(dateStr);
+
+    let cls = 'week-day';
+    if (isToday)    cls += ' is-today';
+    if (isFuture)   cls += ' is-future';
+    if (isSelected) cls += ' selected';
+    if (hasAct)     cls += ' has-activity';
+
+    html += `
+      <div class="${cls}" data-date="${dateStr}">
+        <span class="week-day-label">${DAY_LETTERS[i]}</span>
+        <div class="week-day-circle">
+          <span class="week-day-num">${d.getDate()}</span>
+        </div>
+      </div>`;
+  }
+
+  container.innerHTML = html;
+
+  // Click handlers
+  container.querySelectorAll('.week-day:not(.is-future)').forEach(el => {
+    el.addEventListener('click', async () => {
+      if (!currentUser) return;
+      document.getElementById('homeLogDate').value = el.dataset.date;
+      homeWorkoutType = null;
+      logState.workoutType = null;
+      renderWeekPicker();
+      await renderHomeMetricSections();
+    });
+  });
+
+  // Show/hide next arrow — don't go beyond current week
+  const nextBtn = document.getElementById('weekNext');
+  if (nextBtn) nextBtn.style.opacity = weekPickerOffset >= 0 ? '0.3' : '1';
+  if (nextBtn) nextBtn.style.pointerEvents = weekPickerOffset >= 0 ? 'none' : 'auto';
+}
+
+// Nav buttons
+document.getElementById('weekPrev')?.addEventListener('click', () => {
+  weekPickerOffset--;
+  renderWeekPicker();
+});
+document.getElementById('weekNext')?.addEventListener('click', () => {
+  if (weekPickerOffset >= 0) return;
+  weekPickerOffset++;
+  renderWeekPicker();
+});
+
+// Swipe left/right on the week picker
+document.getElementById('weekDays')?.addEventListener('touchstart', e => {
+  weekPickerTouchStartX = e.touches[0].clientX;
+}, { passive: true });
+
+document.getElementById('weekDays')?.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - weekPickerTouchStartX;
+  if (Math.abs(dx) < 40) return;
+  if (dx < 0) {
+    // Swipe left — go to next week (only if not already current week)
+    if (weekPickerOffset < 0) { weekPickerOffset++; renderWeekPicker(); }
+  } else {
+    // Swipe right — go to previous week
+    weekPickerOffset--;
+    renderWeekPicker();
+  }
+}, { passive: true });
+
 function updateHomeDateStatus() {
-  const dateStr  = document.getElementById('homeLogDate').value;
-  const labelEl  = document.getElementById('homeLogDateLabel');
-  if (!dateStr || !labelEl) return;
-  const d       = new Date(dateStr + 'T00:00:00');
-  const today   = toDateStr(new Date());
-  const isToday = dateStr === today;
-  const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
-  labelEl.textContent = isToday ? `Today — ${dayName}` : dayName;
+  // No-op — week picker replaced the date status label
 }
 
 function updateHomePointsPreview(metrics, challenge, dateStr) {
@@ -682,20 +792,7 @@ function updateHomePointsPreview(metrics, challenge, dateStr) {
 }
 
 // Wire up home page controls
-document.getElementById('homeLogDate')?.addEventListener('change', async () => {
-  if (!currentUser) return;
-  // Prevent future dates on mobile (native picker may ignore max attribute)
-  const today   = toDateStr(new Date());
-  const dateEl  = document.getElementById('homeLogDate');
-  if (dateEl.value > today) {
-    dateEl.value = today;
-    return;
-  }
-  homeWorkoutType = null;
-  logState.workoutType = null;
-  updateHomeDateStatus();
-  await renderHomeMetricSections();
-});
+// homeLogDate changes are now handled by week picker day clicks
 
 document.getElementById('homeClearBtn')?.addEventListener('click', () => {
   ['log_workout_done','log_steps','log_sleep','log_water','log_calories','log_protein','log_carbs','log_fat']
@@ -839,6 +936,9 @@ async function saveHomeLog() {
         await deleteDoc(doc(db, 'personalLogs', personalDocId)).catch(() => {});
       }
     } catch (err) { console.error('Personal log save error:', err); }
+
+    // Refresh week picker to show new activity dots
+    renderWeekPicker();
 
     // Show confirmation modal
     showSaveConfirmModal(results);

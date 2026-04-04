@@ -621,6 +621,125 @@ select.input { cursor:pointer; }
   color: var(--accent);
 }
 
+
+/* ============================================================
+   WEEK DATE PICKER
+   ============================================================ */
+.week-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  user-select: none;
+}
+
+.week-nav-btn {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text2);
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+.week-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.week-days {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.week-day-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.week-day-circle {
+  position: relative;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  transition: all var(--transition);
+}
+
+.week-day-num {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text3);
+  opacity: 0.5;
+  transition: all var(--transition);
+  z-index: 1;
+}
+
+/* Today — double ring */
+.week-day.is-today .week-day-circle {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+.week-day.is-today .week-day-label { color: var(--accent); }
+.week-day.is-today .week-day-num { opacity: 0.8; color: var(--text); }
+
+/* Has activity — accent fill */
+.week-day.has-activity .week-day-circle {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.week-day.has-activity .week-day-num {
+  color: #000;
+  opacity: 1;
+}
+
+/* Selected day */
+.week-day.selected .week-day-circle {
+  border-color: var(--accent);
+  background: rgba(0,229,160,0.12);
+}
+.week-day.selected .week-day-num {
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* Selected + has activity */
+.week-day.selected.has-activity .week-day-circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,229,160,0.3);
+}
+.week-day.selected.has-activity .week-day-num { color: #000; opacity: 1; }
+
+/* Future days — dimmed */
+.week-day.is-future {
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+@media (max-width: 768px) {
+  .week-nav-btn { display: none; } /* hidden on mobile — swipe instead */
+  .week-day-circle { width: 36px; height: 36px; }
+  .week-day-num { font-size: 12px; }
+  .week-day-label { font-size: 9px; }
+  .week-days { gap: 4px; }
+}
 /* ============================================================
    ACTIVITY CALENDAR
    ============================================================ */
@@ -968,22 +1087,7 @@ select.input { cursor:pointer; }
    HOME — Universal Daily Log
    ============================================================ */
 
-.home-log-date-row {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 24px;
-}
-.home-log-date-row .form-group {
-  margin: 0;
-  text-align: center;
-  width: 260px;
-}
-#homeLogDate {
-  width: 260px;
-  text-align: center;
-  display: block;
-  box-sizing: border-box;
-}
+/* home-log-date-row replaced by week picker */
 
 /* Metric pill toggles */
 .home-metric-toggles {
