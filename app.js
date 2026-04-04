@@ -108,6 +108,32 @@ document.querySelectorAll('.mobile-nav-item').forEach(btn => {
   btn.addEventListener('click', () => showPage(btn.dataset.page));
 });
 
+// ============================================================
+//  MOBILE SWIPE — left edge swipe right goes to Home
+// ============================================================
+(function() {
+  let touchStartX = 0;
+  let touchStartY = 0;
+  const EDGE_ZONE  = 30;  // px from left edge to start swipe
+  const MIN_SWIPE  = 80;  // minimum horizontal distance
+  const MAX_VERT   = 60;  // maximum vertical drift (to avoid triggering on scroll)
+
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+
+    // Only trigger if started near the left edge, swiped right enough, and didn't scroll too much
+    if (touchStartX <= EDGE_ZONE && dx >= MIN_SWIPE && dy <= MAX_VERT) {
+      showPage('dashboard');
+    }
+  }, { passive: true });
+})();
+
 // Hide mobile nav on scroll down, show only on genuine scroll up
 (function() {
   let lastScrollY = window.scrollY;
