@@ -721,21 +721,35 @@ async function saveHomeLog() {
           type: homeWorkoutType || null,
         };
       }
-      if (metricsToLog.includes('steps'))  entryData.steps  = parseInt(document.getElementById('log_steps')?.value)  || 0;
-      if (metricsToLog.includes('sleep'))  entryData.sleep  = parseFloat(document.getElementById('log_sleep')?.value) || 0;
-      if (metricsToLog.includes('water'))  entryData.water  = parseInt(document.getElementById('log_water')?.value)  || 0;
+      const stepsVal = parseInt(document.getElementById('log_steps')?.value)   || null;
+      const sleepVal = parseFloat(document.getElementById('log_sleep')?.value) || null;
+      const waterVal = parseInt(document.getElementById('log_water')?.value)   || null;
+      if (metricsToLog.includes('steps'))  entryData.steps  = stepsVal;
+      if (metricsToLog.includes('sleep'))  entryData.sleep  = sleepVal;
+      if (metricsToLog.includes('water'))  entryData.water  = waterVal;
       if (metricsToLog.includes('macros')) {
         entryData.macros = {
-          calories: parseInt(document.getElementById('log_calories')?.value) || 0,
-          protein:  parseInt(document.getElementById('log_protein')?.value)  || 0,
-          carbs:    parseInt(document.getElementById('log_carbs')?.value)    || 0,
-          fat:      parseInt(document.getElementById('log_fat')?.value)      || 0,
+          calories: parseInt(document.getElementById('log_calories')?.value) || null,
+          protein:  parseInt(document.getElementById('log_protein')?.value)  || null,
+          carbs:    parseInt(document.getElementById('log_carbs')?.value)    || null,
+          fat:      parseInt(document.getElementById('log_fat')?.value)      || null,
         };
       }
 
+      const workoutDone = document.getElementById('log_workout_done')?.value;
+      const hasAnyData  = (workoutDone && workoutDone !== 'no') ||
+        stepsVal || sleepVal || waterVal ||
+        parseInt(document.getElementById('log_calories')?.value) ||
+        parseInt(document.getElementById('log_protein')?.value);
+
       const docId = `${c.id}_${currentUser.uid}_${dateStr}`;
-      await setDoc(doc(db, 'activityLogs', docId), entryData);
-      results.push({ name: c.name, pts: total, skipped: false });
+      if (!hasAnyData) {
+        await deleteDoc(doc(db, 'activityLogs', docId)).catch(() => {});
+        results.push({ name: c.name, pts: 0, skipped: false, cleared: true });
+      } else {
+        await setDoc(doc(db, 'activityLogs', docId), entryData);
+        results.push({ name: c.name, pts: total, skipped: false });
+      }
     }
 
     // Show confirmation modal
@@ -757,7 +771,9 @@ function showSaveConfirmModal(results) {
       <span class="save-confirm-name">${escHtml(r.name)}</span>
       ${r.skipped
         ? `<span class="save-confirm-skip">${r.reason}</span>`
-        : `<span class="save-confirm-pts">+${r.pts} pts</span>`}
+        : r.cleared
+          ? `<span class="save-confirm-skip">Entry cleared</span>`
+          : `<span class="save-confirm-pts">+${r.pts} pts</span>`}
     </div>`).join('');
   document.getElementById('saveConfirmModal').classList.add('active');
 }
@@ -1167,21 +1183,28 @@ function renderCalendar() {
 
       let innerHtml = `<div class="cal-day-num">${day.getDate()}</div>`;
 
-      if (entry) {
+      // Only show logged indicator if entry has real data (not all nulls/empty)
+      const hasRealData = entry && (
+        entry.workout?.done === 'yes' ||
+        (entry.steps  != null && entry.steps  > 0) ||
+        (entry.sleep  != null && entry.sleep  > 0) ||
+        (entry.water  != null && entry.water  > 0) ||
+        (entry.macros?.calories != null && entry.macros.calories > 0)
+      );
+
+      if (hasRealData) {
         const isMobile = window.innerWidth <= 768;
         if (isMobile) {
-          // Mobile: green dot + points only — no emojis to avoid layout warping
           innerHtml += `<div class="cal-logged-dot"></div>`;
           if (entry.points > 0) {
             innerHtml += `<div class="cal-day-points">${entry.points}pts</div>`;
           }
         } else {
-          // Desktop: full emojis per metric + points
           const emojis = metrics.map(m => {
             if (m === 'workout') return entry.workout?.done === 'yes' ? '💪' : '';
-            if (m === 'steps')   return (entry.steps || 0) > 0 ? '👟' : '';
-            if (m === 'sleep')   return (entry.sleep || 0) > 0 ? '😴' : '';
-            if (m === 'water')   return (entry.water || 0) > 0 ? '💧' : '';
+            if (m === 'steps')   return (entry.steps  || 0) > 0 ? '👟' : '';
+            if (m === 'sleep')   return (entry.sleep  || 0) > 0 ? '😴' : '';
+            if (m === 'water')   return (entry.water  || 0) > 0 ? '💧' : '';
             if (m === 'macros')  return (entry.macros?.calories || 0) > 0 ? '🥗' : '';
             return '';
           }).filter(Boolean).join('');
@@ -1799,31 +1822,45 @@ async function submitLog(metrics, challenge, dateStr) {
       updatedAt:   serverTimestamp(),
     };
 
-    // Add each metric's raw data
+    // Add each metric's raw data — use null for empty so charts show gaps not zeros
+    const workoutDone = document.getElementById('log_workout_done')?.value;
     if (metrics.includes('workout')) {
       entryData.workout = {
-        done: document.getElementById('log_workout_done')?.value || 'no',
+        done: workoutDone || 'no',
         type: logState.workoutType || null,
       };
     }
-    if (metrics.includes('steps'))  entryData.steps  = parseInt(document.getElementById('log_steps')?.value)  || 0;
-    if (metrics.includes('sleep'))  entryData.sleep  = parseFloat(document.getElementById('log_sleep')?.value) || 0;
-    if (metrics.includes('water'))  entryData.water  = parseInt(document.getElementById('log_water')?.value)  || 0;
+    const stepsVal  = parseInt(document.getElementById('log_steps')?.value)   || null;
+    const sleepVal  = parseFloat(document.getElementById('log_sleep')?.value) || null;
+    const waterVal  = parseInt(document.getElementById('log_water')?.value)   || null;
+    if (metrics.includes('steps'))  entryData.steps  = stepsVal;
+    if (metrics.includes('sleep'))  entryData.sleep  = sleepVal;
+    if (metrics.includes('water'))  entryData.water  = waterVal;
     if (metrics.includes('macros')) {
       entryData.macros = {
-        calories: parseInt(document.getElementById('log_calories')?.value) || 0,
-        protein:  parseInt(document.getElementById('log_protein')?.value)  || 0,
-        carbs:    parseInt(document.getElementById('log_carbs')?.value)    || 0,
-        fat:      parseInt(document.getElementById('log_fat')?.value)      || 0,
+        calories: parseInt(document.getElementById('log_calories')?.value) || null,
+        protein:  parseInt(document.getElementById('log_protein')?.value)  || null,
+        carbs:    parseInt(document.getElementById('log_carbs')?.value)    || null,
+        fat:      parseInt(document.getElementById('log_fat')?.value)      || null,
       };
     }
 
-    // Upsert: use a deterministic doc ID so re-saving replaces the entry
-    const docId = `${challenge.id}_${currentUser.uid}_${dateStr}`;
-    await setDoc(doc(db, 'activityLogs', docId), entryData);
+    // Check if entry is completely empty — if so, delete the doc instead of saving zeros
+    const hasAnyData = (workoutDone && workoutDone !== 'no') ||
+      stepsVal || sleepVal || waterVal ||
+      parseInt(document.getElementById('log_calories')?.value) ||
+      parseInt(document.getElementById('log_protein')?.value);
 
-    // Update local cache
-    logState.entries[dateStr] = { id: docId, ...entryData };
+    const docId = `${challenge.id}_${currentUser.uid}_${dateStr}`;
+
+    if (!hasAnyData) {
+      // Delete the entry if it exists
+      await deleteDoc(doc(db, 'activityLogs', docId)).catch(() => {});
+      delete logState.entries[dateStr];
+    } else {
+      await setDoc(doc(db, 'activityLogs', docId), entryData);
+      logState.entries[dateStr] = { id: docId, ...entryData };
+    }
 
     // Close modal and refresh calendar
     closeLogModal();
