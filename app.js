@@ -560,12 +560,7 @@ async function loadDashboard() {
     logContainer.style.display = 'block';
 
     // Set up date picker
-    const today = toDateStr(new Date());
-    const homeDate = document.getElementById('homeLogDate');
-    if (!homeDate.value) homeDate.value = today;
-    homeDate.max = today;
-
-    // Set today as selected date
+    const today    = toDateStr(new Date());
     const homeDate = document.getElementById('homeLogDate');
     if (!homeDate.value) homeDate.value = today;
 
@@ -664,11 +659,11 @@ function getSundayOfWeek(offset = 0) {
 }
 
 function renderWeekPicker() {
-  const today     = toDateStr(new Date());
-  const selected  = document.getElementById('homeLogDate').value || today;
-  const sunday    = getSundayOfWeek(weekPickerOffset);
   const container = document.getElementById('weekDays');
-  if (!container) return;
+  if (!container) return; // not on home page yet
+  const today     = toDateStr(new Date());
+  const selected  = document.getElementById('homeLogDate')?.value || today;
+  const sunday    = getSundayOfWeek(weekPickerOffset);
 
   // Get logged dates from home challenges for highlighting
   const loggedDates = new Set();
