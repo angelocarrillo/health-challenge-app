@@ -645,6 +645,14 @@ async function renderHomeMetricSections() {
     renderMetricSection(m, repChallenge, dateStr, homeExistingEntry, true)
   ).join('');
 
+  // Staggered pop-in animation on each metric section
+  sectionsEl.querySelectorAll('.metric-section').forEach((el, i) => {
+    el.style.animationDelay = `${i * 55}ms`;
+    el.classList.remove('metric-section-animate');
+    void el.offsetWidth; // force reflow
+    el.classList.add('metric-section-animate');
+  });
+
   // Pre-fill existing values if editing
   if (homeExistingEntry) {
     populateExistingEntry(homeExistingEntry, metricsToShow);

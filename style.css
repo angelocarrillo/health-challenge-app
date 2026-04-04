@@ -1154,6 +1154,16 @@ select.input { cursor:pointer; }
   margin-right: auto;
 }
 
+/* Metric section pop-in animation */
+@keyframes metricPopIn {
+  0%   { opacity: 0; transform: scale(0.94) translateY(6px); }
+  60%  { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.metric-section-animate {
+  animation: metricPopIn 0.28s cubic-bezier(.4,0,.2,1) both;
+}
+
 /* Challenge applied list in save confirmation */
 .save-confirm-row {
   display: flex;
