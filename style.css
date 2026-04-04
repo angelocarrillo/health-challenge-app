@@ -651,7 +651,8 @@ select.input { cursor:pointer; }
   gap: 6px;
   flex: 1;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
+  padding: 6px 0;
 }
 
 .week-day {
