@@ -1102,7 +1102,7 @@ detailModal.addEventListener('click', async (e) => {
         <button type="button" id="editPayoutModePercent" class="btn-${cfg.mode==='percent'?'primary':'secondary'}" style="flex:1;padding:8px;font-size:13px;">% Percentage</button>
         <button type="button" id="editPayoutModeDollar"  class="btn-${cfg.mode==='dollar' ?'primary':'secondary'}" style="flex:1;padding:8px;font-size:13px;">$ Dollar</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div id="editPayoutGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
         ${['first','second','third'].map((place,i) => `
           <div>
             <label style="font-size:11px;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:6px;">${['🥇 1st','🥈 2nd','🥉 3rd'][i]}</label>
@@ -1144,16 +1144,60 @@ detailModal.addEventListener('click', async (e) => {
     document.getElementById(`editPayout_${p}`)?.addEventListener('input', validateEdit);
   });
 
+  function rebuildEditInputs(mode, values) {
+    const grid = body.querySelector('#editPayoutGrid');
+    if (!grid) return;
+    grid.innerHTML = ['first','second','third'].map((place, i) => `
+      <div>
+        <label style="font-size:11px;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:6px;">${['🥇 1st','🥈 2nd','🥉 3rd'][i]}</label>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span style="color:var(--text2);font-size:13px;">${mode==='dollar'?'$':''}</span>
+          <input type="number" id="editPayout_${place}" class="input" value="${values[place]||0}" min="0" style="padding:8px;" inputmode="numeric"/>
+          <span style="color:var(--text2);font-size:13px;">${mode==='percent'?'%':''}</span>
+        </div>
+      </div>`).join('');
+    ['first','second','third'].forEach(p => {
+      document.getElementById(`editPayout_${p}`)?.addEventListener('input', validateEdit);
+    });
+  }
+
   body.querySelector('#editPayoutModePercent')?.addEventListener('click', () => {
     body.dataset.mode = 'percent';
     body.querySelector('#editPayoutModePercent').className = 'btn-primary';
     body.querySelector('#editPayoutModeDollar').className  = 'btn-secondary';
+    // Convert current dollar values to percentages
+    const count = (c.participants || []).length;
+    const pot   = c.wager * count;
+    const cur = {
+      first:  parseFloat(document.getElementById('editPayout_first')?.value)  || 0,
+      second: parseFloat(document.getElementById('editPayout_second')?.value) || 0,
+      third:  parseFloat(document.getElementById('editPayout_third')?.value)  || 0,
+    };
+    const converted = pot > 0
+      ? { first: Math.round(cur.first/pot*100), second: Math.round(cur.second/pot*100), third: Math.round(cur.third/pot*100) }
+      : { first: 60, second: 30, third: 10 };
+    rebuildEditInputs('percent', converted);
     validateEdit();
   });
+
   body.querySelector('#editPayoutModeDollar')?.addEventListener('click', () => {
     body.dataset.mode = 'dollar';
     body.querySelector('#editPayoutModeDollar').className  = 'btn-primary';
     body.querySelector('#editPayoutModePercent').className = 'btn-secondary';
+    // Convert current percentage values to dollar amounts based on current pot
+    const count = (c.participants || []).length;
+    const pot   = c.wager * count;
+    const cur = {
+      first:  parseFloat(document.getElementById('editPayout_first')?.value)  || 0,
+      second: parseFloat(document.getElementById('editPayout_second')?.value) || 0,
+      third:  parseFloat(document.getElementById('editPayout_third')?.value)  || 0,
+    };
+    const converted = {
+      first:  Math.round(pot * cur.first  / 100),
+      second: Math.round(pot * cur.second / 100),
+      third:  Math.round(pot * cur.third  / 100),
+    };
+    rebuildEditInputs('dollar', converted);
     validateEdit();
   });
 
