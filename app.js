@@ -2069,16 +2069,13 @@ function updatePointsPreview(metrics, challenge, dateStr) {
 async function submitLog(metrics, challenge, dateStr) {
   if (!currentUser || !challenge) return;
 
-  console.log('=== SUBMIT LOG ===');
-  console.log('dateStr:', dateStr);
-  console.log('workout_done el:', document.getElementById('log_workout_done'));
-  console.log('workout_done val:', document.getElementById('log_workout_done')?.value);
-  console.log('steps el:', document.getElementById('log_steps'));
-  console.log('steps val:', document.getElementById('log_steps')?.value);
-  console.log('modal active:', document.getElementById('logEntryModal')?.classList.contains('active'));
-  console.log('ALL inputs in modal:', [...document.querySelectorAll('#logEntryModal input, #logEntryModal select')].map(el => el.id + '=' + el.value));
+  const workoutDoneDbg = document.getElementById('log_workout_done')?.value;
+  const stepsDbg = parseInt(document.getElementById('log_steps')?.value) || null;
+  const hasAnyDataDbg = (workoutDoneDbg && workoutDoneDbg !== 'no') || stepsDbg;
+  console.log('hasAnyData:', hasAnyDataDbg, 'workoutDone:', workoutDoneDbg, 'steps:', stepsDbg);
 
   const { results, total } = calcPointsForEntry(metrics, challenge, dateStr);
+  console.log('points total:', total, 'results:', results);
   const submitBtn = document.getElementById('submitLogBtn');
   submitBtn.textContent = 'Saving...';
   submitBtn.disabled = true;
