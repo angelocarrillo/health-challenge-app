@@ -622,6 +622,9 @@ async function renderHomeMetricSections() {
     logState.entries  = {};
   }
 
+  // Re-render week picker now that entries are loaded so activity dots show
+  renderWeekPicker();
+
   // Fetch personal log for the selected date to pre-fill form
   let homeExistingEntry = null;
   try {
