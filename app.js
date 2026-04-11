@@ -2070,9 +2070,14 @@ function updatePointsPreview(metrics, challenge, dateStr) {
 //  SUBMIT LOG ENTRY
 // ============================================================
 async function submitLog(metrics, challenge, dateStr) {
-  if (!currentUser || !challenge) return;
+  console.log('submitLog called:', { metrics, challengeId: challenge?.id, dateStr });
+  if (!currentUser || !challenge) {
+    console.error('submitLog: missing currentUser or challenge', { currentUser: !!currentUser, challenge: !!challenge });
+    return;
+  }
 
   const { results, total } = calcPointsForEntry(metrics, challenge, dateStr);
+  console.log('submitLog points:', total, results);
   const submitBtn = document.getElementById('submitLogBtn');
   submitBtn.textContent = 'Saving...';
   submitBtn.disabled = true;
