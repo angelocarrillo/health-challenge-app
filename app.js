@@ -1937,8 +1937,11 @@ function attachLogListeners(metrics, challenge, dateStr) {
     updatePointsPreview(metrics, challenge, dateStr);
   };
 
-  // Submit button
-  document.getElementById('submitLogBtn').onclick = () => submitLog(metrics, challenge, dateStr);
+  // Submit button — use logState.activeDate so it always reads current date
+  document.getElementById('submitLogBtn').onclick = () => {
+    const activeDateStr = logState.activeDate || dateStr;
+    submitLog(metrics, challenge, activeDateStr);
+  };
 }
 
 // ============================================================
@@ -2070,14 +2073,15 @@ function updatePointsPreview(metrics, challenge, dateStr) {
 //  SUBMIT LOG ENTRY
 // ============================================================
 async function submitLog(metrics, challenge, dateStr) {
-  console.log('submitLog called:', { metrics, challengeId: challenge?.id, dateStr });
-  if (!currentUser || !challenge) {
-    console.error('submitLog: missing currentUser or challenge', { currentUser: !!currentUser, challenge: !!challenge });
-    return;
-  }
+  if (!currentUser || !challenge) return;
+
+  // Debug: log what inputs contain at save time
+  console.log('submitLog - dateStr:', dateStr);
+  console.log('submitLog - workout_done:', document.getElementById('log_workout_done')?.value);
+  console.log('submitLog - steps:', document.getElementById('log_steps')?.value);
+  console.log('submitLog - logModal visible:', document.getElementById('logEntryModal')?.classList.contains('active'));
 
   const { results, total } = calcPointsForEntry(metrics, challenge, dateStr);
-  console.log('submitLog points:', total, results);
   const submitBtn = document.getElementById('submitLogBtn');
   submitBtn.textContent = 'Saving...';
   submitBtn.disabled = true;
