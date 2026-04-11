@@ -814,10 +814,10 @@ function updateHomePointsPreview(metrics, challenge, dateStr) {
   const totalEl      = document.getElementById('homePointsTotal');
 
   const hasInput = metrics.some(m => {
-    if (m === 'workout') return document.getElementById('log_workout_done')?.value;
-    if (m === 'steps')   return document.getElementById('log_steps')?.value;
-    if (m === 'sleep')   return document.getElementById('log_sleep')?.value;
-    if (m === 'water')   return document.getElementById('log_water')?.value;
+    if (m === 'workout') return getInputVal('log_workout_done');
+    if (m === 'steps')   return getInputVal('log_steps');
+    if (m === 'sleep')   return getInputVal('log_sleep');
+    if (m === 'water')   return getInputVal('log_water');
     return false;
   });
 
@@ -914,30 +914,30 @@ async function saveHomeLog() {
       };
       if (metricsToLog.includes('workout')) {
         entryData.workout = {
-          done: document.getElementById('log_workout_done')?.value || 'no',
+          done: getInputVal('log_workout_done') || 'no',
           type: homeWorkoutType || null,
         };
       }
-      const stepsVal = parseInt(document.getElementById('log_steps')?.value)   || null;
-      const sleepVal = parseFloat(document.getElementById('log_sleep')?.value) || null;
-      const waterVal = parseInt(document.getElementById('log_water')?.value)   || null;
+      const stepsVal = parseInt(getInputVal('log_steps'))   || null;
+      const sleepVal = parseFloat(getInputVal('log_sleep')) || null;
+      const waterVal = parseInt(getInputVal('log_water'))   || null;
       if (metricsToLog.includes('steps'))  entryData.steps  = stepsVal;
       if (metricsToLog.includes('sleep'))  entryData.sleep  = sleepVal;
       if (metricsToLog.includes('water'))  entryData.water  = waterVal;
       if (metricsToLog.includes('macros')) {
         entryData.macros = {
-          calories: parseInt(document.getElementById('log_calories')?.value) || null,
-          protein:  parseInt(document.getElementById('log_protein')?.value)  || null,
-          carbs:    parseInt(document.getElementById('log_carbs')?.value)    || null,
-          fat:      parseInt(document.getElementById('log_fat')?.value)      || null,
+          calories: parseInt(getInputVal('log_calories')) || null,
+          protein:  parseInt(getInputVal('log_protein'))  || null,
+          carbs:    parseInt(getInputVal('log_carbs'))    || null,
+          fat:      parseInt(getInputVal('log_fat'))      || null,
         };
       }
 
-      const workoutDone = document.getElementById('log_workout_done')?.value;
+      const workoutDone = getInputVal('log_workout_done');
       const hasAnyData  = (workoutDone && workoutDone !== 'no') ||
         stepsVal || sleepVal || waterVal ||
-        parseInt(document.getElementById('log_calories')?.value) ||
-        parseInt(document.getElementById('log_protein')?.value);
+        parseInt(getInputVal('log_calories')) ||
+        parseInt(getInputVal('log_protein'));
 
       const docId = `${c.id}_${currentUser.uid}_${dateStr}`;
       if (!hasAnyData) {
@@ -956,16 +956,16 @@ async function saveHomeLog() {
         date:      dateStr,
         updatedAt: serverTimestamp(),
       };
-      const workoutDone = document.getElementById('log_workout_done')?.value;
+      const workoutDone = getInputVal('log_workout_done');
       personalEntry.workout  = { done: workoutDone || 'no', type: homeWorkoutType || null };
-      personalEntry.steps    = parseInt(document.getElementById('log_steps')?.value)   || null;
-      personalEntry.sleep    = parseFloat(document.getElementById('log_sleep')?.value) || null;
-      personalEntry.water    = parseInt(document.getElementById('log_water')?.value)   || null;
+      personalEntry.steps    = parseInt(getInputVal('log_steps'))   || null;
+      personalEntry.sleep    = parseFloat(getInputVal('log_sleep')) || null;
+      personalEntry.water    = parseInt(getInputVal('log_water'))   || null;
       personalEntry.macros   = {
-        calories: parseInt(document.getElementById('log_calories')?.value) || null,
-        protein:  parseInt(document.getElementById('log_protein')?.value)  || null,
-        carbs:    parseInt(document.getElementById('log_carbs')?.value)    || null,
-        fat:      parseInt(document.getElementById('log_fat')?.value)      || null,
+        calories: parseInt(getInputVal('log_calories')) || null,
+        protein:  parseInt(getInputVal('log_protein'))  || null,
+        carbs:    parseInt(getInputVal('log_carbs'))    || null,
+        fat:      parseInt(getInputVal('log_fat'))      || null,
       };
       const personalDocId = `${currentUser.uid}_${dateStr}`;
       const hasPersonalData = (workoutDone && workoutDone !== 'no') ||
@@ -1939,6 +1939,25 @@ function attachLogListeners(metrics, challenge, dateStr) {
 }
 
 // ============================================================
+//  SCOPED INPUT READER
+//  Reads from the active modal if open, otherwise falls back to document
+// ============================================================
+function getInputVal(id) {
+  // Try modal first, then home page sections, then document-wide
+  const modal = document.getElementById('logEntryModal');
+  if (modal?.classList.contains('active')) {
+    const el = modal.querySelector(`#${id}`);
+    if (el) return el.value;
+  }
+  const homeSection = document.getElementById('homeMetricSections');
+  if (homeSection) {
+    const el = homeSection.querySelector(`#${id}`);
+    if (el) return el.value;
+  }
+  return document.getElementById(id)?.value ?? '';
+}
+
+// ============================================================
 //  POINT CALCULATION ENGINE
 // ============================================================
 function calcPointsForEntry(metrics, challenge, dateStr) {
@@ -1953,7 +1972,7 @@ function calcPointsForEntry(metrics, challenge, dateStr) {
     const goal = getGoalForMetric(metric, c, dateStr);
 
     if (metric === 'workout') {
-      const done = document.getElementById('log_workout_done')?.value === 'yes';
+      const done = getInputVal('log_workout_done') === 'yes';
       if (!done) { results.workout = { pts: 0, note: 'No workout logged' }; continue; }
 
       const weeklyGoal = goal || 3;
@@ -1993,7 +2012,7 @@ function calcPointsForEntry(metrics, challenge, dateStr) {
       total += pts;
 
     } else if (metric === 'steps') {
-      const steps = parseInt(document.getElementById('log_steps')?.value) || 0;
+      const steps = parseInt(getInputVal('log_steps')) || 0;
       if (!steps) { results.steps = { pts: 0, note: 'No steps entered' }; continue; }
 
       // Running sport modifier: step goal × 1.5
@@ -2013,7 +2032,7 @@ function calcPointsForEntry(metrics, challenge, dateStr) {
       total += pts;
 
     } else if (metric === 'sleep') {
-      const hours = parseFloat(document.getElementById('log_sleep')?.value) || 0;
+      const hours = parseFloat(getInputVal('log_sleep')) || 0;
       if (!hours) { results.sleep = { pts: 0, note: 'No sleep logged' }; continue; }
       const sleepGoal = goal || 8;
       const hit = hours >= sleepGoal;
@@ -2023,7 +2042,7 @@ function calcPointsForEntry(metrics, challenge, dateStr) {
       total += pts;
 
     } else if (metric === 'water') {
-      const cups = parseInt(document.getElementById('log_water')?.value) || 0;
+      const cups = parseInt(getInputVal('log_water')) || 0;
       if (!cups) { results.water = { pts: 0, note: 'No water logged' }; continue; }
       const waterGoal = goal || 10;
       const hit = cups >= waterGoal;
@@ -2044,10 +2063,10 @@ function updatePointsPreview(metrics, challenge, dateStr) {
   const totalEl = document.getElementById('pointsTotal');
 
   const hasAnyInput = metrics.some(m => {
-    if (m === 'workout') return document.getElementById('log_workout_done')?.value;
-    if (m === 'steps')   return document.getElementById('log_steps')?.value;
-    if (m === 'sleep')   return document.getElementById('log_sleep')?.value;
-    if (m === 'water')   return document.getElementById('log_water')?.value;
+    if (m === 'workout') return getInputVal('log_workout_done');
+    if (m === 'steps')   return getInputVal('log_steps');
+    if (m === 'sleep')   return getInputVal('log_sleep');
+    if (m === 'water')   return getInputVal('log_water');
     return false;
   });
 
@@ -2069,13 +2088,7 @@ function updatePointsPreview(metrics, challenge, dateStr) {
 async function submitLog(metrics, challenge, dateStr) {
   if (!currentUser || !challenge) return;
 
-  const workoutDoneDbg = document.getElementById('log_workout_done')?.value;
-  const stepsDbg = parseInt(document.getElementById('log_steps')?.value) || null;
-  const hasAnyDataDbg = (workoutDoneDbg && workoutDoneDbg !== 'no') || stepsDbg;
-  console.log('hasAnyData:', hasAnyDataDbg, 'workoutDone:', workoutDoneDbg, 'steps:', stepsDbg);
-
   const { results, total } = calcPointsForEntry(metrics, challenge, dateStr);
-  console.log('points total:', total, 'results:', results);
   const submitBtn = document.getElementById('submitLogBtn');
   submitBtn.textContent = 'Saving...';
   submitBtn.disabled = true;
@@ -2091,33 +2104,33 @@ async function submitLog(metrics, challenge, dateStr) {
     };
 
     // Add each metric's raw data — use null for empty so charts show gaps not zeros
-    const workoutDone = document.getElementById('log_workout_done')?.value;
+    const workoutDone = getInputVal('log_workout_done');
     if (metrics.includes('workout')) {
       entryData.workout = {
         done: workoutDone || 'no',
         type: logState.workoutType || null,
       };
     }
-    const stepsVal  = parseInt(document.getElementById('log_steps')?.value)   || null;
-    const sleepVal  = parseFloat(document.getElementById('log_sleep')?.value) || null;
-    const waterVal  = parseInt(document.getElementById('log_water')?.value)   || null;
+    const stepsVal  = parseInt(getInputVal('log_steps'))   || null;
+    const sleepVal  = parseFloat(getInputVal('log_sleep')) || null;
+    const waterVal  = parseInt(getInputVal('log_water'))   || null;
     if (metrics.includes('steps'))  entryData.steps  = stepsVal;
     if (metrics.includes('sleep'))  entryData.sleep  = sleepVal;
     if (metrics.includes('water'))  entryData.water  = waterVal;
     if (metrics.includes('macros')) {
       entryData.macros = {
-        calories: parseInt(document.getElementById('log_calories')?.value) || null,
-        protein:  parseInt(document.getElementById('log_protein')?.value)  || null,
-        carbs:    parseInt(document.getElementById('log_carbs')?.value)    || null,
-        fat:      parseInt(document.getElementById('log_fat')?.value)      || null,
+        calories: parseInt(getInputVal('log_calories')) || null,
+        protein:  parseInt(getInputVal('log_protein'))  || null,
+        carbs:    parseInt(getInputVal('log_carbs'))    || null,
+        fat:      parseInt(getInputVal('log_fat'))      || null,
       };
     }
 
     // Check if entry is completely empty — if so, delete the doc instead of saving zeros
     const hasAnyData = (workoutDone && workoutDone !== 'no') ||
       stepsVal || sleepVal || waterVal ||
-      parseInt(document.getElementById('log_calories')?.value) ||
-      parseInt(document.getElementById('log_protein')?.value);
+      parseInt(getInputVal('log_calories')) ||
+      parseInt(getInputVal('log_protein'));
 
     const docId = `${challenge.id}_${currentUser.uid}_${dateStr}`;
 
