@@ -1526,21 +1526,21 @@ async function openLogModal(dateStr) {
   sectionsEl.innerHTML = metrics.map(m => renderMetricSection(m, c, dateStr, existing)).join('');
   document.getElementById('pointsPreview').style.display = 'none';
 
+  // Show modal FIRST so setInputVal knows to target modal inputs
+  logModal.classList.add('active');
+
   // Clear inputs then populate
   ['log_workout_done','log_steps','log_sleep','log_water',
    'log_calories','log_protein','log_carbs','log_fat'].forEach(id => {
-    const el = document.getElementById(id);
+    const el = logModal.querySelector(`#${id}`);
     if (el) el.value = '';
   });
-  document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
+  logModal.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
 
   if (existing) populateExistingEntry(existing, metrics);
 
   attachLogListeners(metrics, c, dateStr);
   if (existing) updatePointsPreview(metrics, c, dateStr);
-
-  // Step 3: Show modal only after everything is ready
-  logModal.classList.add('active');
 }
 
 function closeLogModal() {
