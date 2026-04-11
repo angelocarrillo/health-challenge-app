@@ -203,21 +203,17 @@
       <div id="analyticsContainer" style="display:none;">
         <!-- View toggle -->
         <div class="tab-bar analytics-tab-bar" style="margin-bottom:28px;">
+          <button class="tab active" data-atab="personal">👤 Personal</button>
           <button class="tab" data-atab="leaderboard">🏅 Leaderboard</button>
           <button class="tab" data-atab="progress">📈 Progress</button>
-          <button class="tab" data-atab="group">👥 Group</button>
-          <button class="tab" data-atab="breakdown">💪 Breakdown</button>
           <button class="tab" data-atab="history">🕘 History</button>
-          <button class="tab active" data-atab="personal">👤 Personal</button>
         </div>
         <!-- Mobile dropdown version of analytics tabs -->
         <select id="analyticsTabSelect" class="input analytics-tab-select" style="display:none;margin-bottom:28px;">
+          <option value="personal" selected>👤 Personal</option>
           <option value="leaderboard">🏅 Leaderboard</option>
           <option value="progress">📈 Progress</option>
-          <option value="group">👥 Group</option>
-          <option value="breakdown">💪 Breakdown</option>
           <option value="history">🕘 History</option>
-          <option value="personal" selected>👤 Personal</option>
         </select>
 
         <!-- LEADERBOARD -->
@@ -228,27 +224,6 @@
         <!-- PROGRESS -->
         <div id="atab-progress" class="atab-content">
           <div id="progressChartsContainer"></div>
-        </div>
-
-        <!-- GROUP -->
-        <div id="atab-group" class="atab-content">
-          <div class="chart-card">
-            <div class="chart-title">Group Total Points by Week</div>
-            <canvas id="groupBarChart" height="100"></canvas>
-          </div>
-          <div class="chart-card" style="margin-top:20px;">
-            <div class="chart-title">Group Cumulative Points</div>
-            <canvas id="groupLineChart" height="100"></canvas>
-          </div>
-        </div>
-
-        <!-- BREAKDOWN -->
-        <div id="atab-breakdown" class="atab-content">
-          <div class="analytics-toggle" id="breakdownToggle">
-            <button class="atoggle-btn active" data-view="me">My Breakdown</button>
-            <button class="atoggle-btn" data-view="all">Everyone</button>
-          </div>
-          <div id="breakdownContent"></div>
         </div>
 
         <!-- HISTORY -->

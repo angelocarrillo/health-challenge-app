@@ -2272,15 +2272,7 @@ document.getElementById('analyticsTabSelect')?.addEventListener('change', (e) =>
 
 // Progress toggle removed — charts now show all participants by default
 
-// Breakdown toggle
-document.querySelectorAll('#breakdownToggle .atoggle-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#breakdownToggle .atoggle-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const cid = document.getElementById('analyticsChallengeSelect').value;
-    if (cid) renderBreakdown(cid, btn.dataset.view);
-  });
-});
+// Breakdown toggle removed
 
 // Challenge selector
 document.getElementById('analyticsChallengeSelect').addEventListener('change', async (e) => {
@@ -2341,8 +2333,7 @@ async function populateAnalyticsSelector() {
 async function renderAnalyticsTab(tab, challengeId) {
   if (tab === 'leaderboard') await renderLeaderboard(challengeId);
   if (tab === 'progress')    await renderProgressCharts(challengeId);
-  if (tab === 'group')       await renderGroupCharts(challengeId);
-  if (tab === 'breakdown')   await renderBreakdown(challengeId, document.querySelector('#breakdownToggle .atoggle-btn.active')?.dataset.view || 'me');
+  // Group and Breakdown tabs removed
   if (tab === 'history')     await renderHistory();
   if (tab === 'personal')    await renderPersonalCharts();
 }
@@ -2588,9 +2579,10 @@ async function renderProgressCharts(challengeId) {
       spanGaps: false,
     }));
 
+    const stepLabels = allDates.map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
     chartInstances.prog_steps = new Chart(
       document.getElementById('prog_steps').getContext('2d'),
-      { type: 'line', data: { labels: allDates, datasets }, options: chartOpts('Steps', 'steps') }
+      { type: 'line', data: { labels: stepLabels, datasets }, options: chartOpts('Steps', 'steps') }
     );
   }
 
