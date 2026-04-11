@@ -2069,6 +2069,15 @@ function updatePointsPreview(metrics, challenge, dateStr) {
 async function submitLog(metrics, challenge, dateStr) {
   if (!currentUser || !challenge) return;
 
+  console.log('=== SUBMIT LOG ===');
+  console.log('dateStr:', dateStr);
+  console.log('workout_done el:', document.getElementById('log_workout_done'));
+  console.log('workout_done val:', document.getElementById('log_workout_done')?.value);
+  console.log('steps el:', document.getElementById('log_steps'));
+  console.log('steps val:', document.getElementById('log_steps')?.value);
+  console.log('modal active:', document.getElementById('logEntryModal')?.classList.contains('active'));
+  console.log('ALL inputs in modal:', [...document.querySelectorAll('#logEntryModal input, #logEntryModal select')].map(el => el.id + '=' + el.value));
+
   const { results, total } = calcPointsForEntry(metrics, challenge, dateStr);
   const submitBtn = document.getElementById('submitLogBtn');
   submitBtn.textContent = 'Saving...';
