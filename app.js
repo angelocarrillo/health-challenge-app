@@ -1503,10 +1503,24 @@ function openLogModal(dateStr) {
   sectionsEl.innerHTML = metrics.map(m => renderMetricSection(m, c, dateStr, existing)).join('');
   document.getElementById('pointsPreview').style.display = 'none';
 
-  if (existing) populateExistingEntry(existing, metrics);
+  // Always clear all inputs first to avoid stale data from previous modal open
+  ['log_workout_done','log_steps','log_sleep','log_water',
+   'log_calories','log_protein','log_carbs','log_fat'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
+  logState.workoutType = null;
+
+  // Then populate with existing data if available
+  if (existing) {
+    logState.workoutType = existing?.workout?.type || null;
+    populateExistingEntry(existing, metrics);
+  }
 
   attachLogListeners(metrics, c, dateStr);
-  updatePointsPreview(metrics, c, dateStr);
+  // Only calculate points if there's existing data — prevents ghost preview
+  if (existing) updatePointsPreview(metrics, c, dateStr);
 
   logModal.classList.add('active');
 }
