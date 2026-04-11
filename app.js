@@ -1882,25 +1882,48 @@ function getGoalForMetric(metric, challenge, dateStr) {
 
 // ============================================================
 //  POPULATE EXISTING ENTRY
+//  Uses setInputVal to write to the correct container
+//  (modal takes priority over home page to avoid duplicate ID conflict)
 // ============================================================
+function setInputVal(id, value) {
+  // Write to modal if active, otherwise home page sections
+  const modal = document.getElementById('logEntryModal');
+  if (modal?.classList.contains('active')) {
+    const el = modal.querySelector(`#${id}`);
+    if (el) { el.value = value; return; }
+  }
+  const homeSection = document.getElementById('homeMetricSections');
+  if (homeSection) {
+    const el = homeSection.querySelector(`#${id}`);
+    if (el) { el.value = value; return; }
+  }
+  const el = document.getElementById(id);
+  if (el) el.value = value;
+}
+
 function populateExistingEntry(entry, metrics) {
   if (metrics.includes('workout')) {
-    if (entry.workout?.done) document.getElementById('log_workout_done').value = entry.workout.done;
+    if (entry.workout?.done) setInputVal('log_workout_done', entry.workout.done);
     if (entry.workout?.type) {
       logState.workoutType = entry.workout.type;
-      document.querySelectorAll('.workout-type-btn').forEach(btn => {
+      // Scope workout type buttons to active modal or home sections
+      const modal = document.getElementById('logEntryModal');
+      const container = modal?.classList.contains('active')
+        ? modal
+        : (document.getElementById('homeMetricSections') || document);
+      container.querySelectorAll('.workout-type-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.type === entry.workout.type);
       });
     }
   }
-  if (metrics.includes('steps')  && entry.steps  != null) document.getElementById('log_steps').value  = entry.steps;
-  if (metrics.includes('sleep')  && entry.sleep  != null) document.getElementById('log_sleep').value  = entry.sleep;
-  if (metrics.includes('water')  && entry.water  != null) document.getElementById('log_water').value  = entry.water;
+  if (metrics.includes('steps')  && entry.steps  != null) setInputVal('log_steps',    entry.steps);
+  if (metrics.includes('sleep')  && entry.sleep  != null) setInputVal('log_sleep',    entry.sleep);
+  if (metrics.includes('water')  && entry.water  != null) setInputVal('log_water',    entry.water);
   if (metrics.includes('macros')) {
-    if (entry.macros?.calories != null) document.getElementById('log_calories').value = entry.macros.calories;
-    if (entry.macros?.protein  != null) document.getElementById('log_protein').value  = entry.macros.protein;
-    if (entry.macros?.carbs    != null) document.getElementById('log_carbs').value    = entry.macros.carbs;
-    if (entry.macros?.fat      != null) document.getElementById('log_fat').value      = entry.macros.fat;
+    if (entry.macros?.calories != null) setInputVal('log_calories', entry.macros.calories);
+    if (entry.macros?.protein  != null) setInputVal('log_protein',  entry.macros.protein);
+    if (entry.macros?.carbs    != null) setInputVal('log_carbs',    entry.macros.carbs);
+    if (entry.macros?.fat      != null) setInputVal('log_fat',      entry.macros.fat);
   }
 }
 
@@ -1926,10 +1949,12 @@ function attachLogListeners(metrics, challenge, dateStr) {
     el?.addEventListener('input',  () => updatePointsPreview(metrics, challenge, dateStr));
   });
 
-  // Clear button
+  // Clear button — scope to modal to avoid clearing home page inputs
   document.getElementById('clearLogBtn').onclick = () => {
-    inputIds.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
+    const modal = document.getElementById('logEntryModal');
+    const container = modal?.classList.contains('active') ? modal : document;
+    inputIds.forEach(id => { const el = container.querySelector(`#${id}`); if (el) el.value = ''; });
+    container.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
     logState.workoutType = null;
     updatePointsPreview(metrics, challenge, dateStr);
   };
