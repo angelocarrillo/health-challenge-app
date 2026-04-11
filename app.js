@@ -1472,6 +1472,7 @@ function renderCalendar() {
     if (!isEnded && isFutureDay) return;
     cell.style.cursor = 'pointer';
     cell.addEventListener('click', () => openLogModal(cell.dataset.date));
+    // openLogModal is async but we don't need to await it here
   });
 }
 
@@ -1482,13 +1483,35 @@ const logModal = document.getElementById('logEntryModal');
 document.getElementById('closeLogModal').addEventListener('click', closeLogModal);
 logModal.addEventListener('click', (e) => { if (e.target === logModal) closeLogModal(); });
 
-function openLogModal(dateStr) {
-  const c       = logState.challenge;
+async function openLogModal(dateStr) {
+  const c = logState.challenge;
   if (!c) return;
-  const metrics  = c.metrics || ['workout','steps'];
+  const metrics = c.metrics || ['workout','steps'];
+
+  // Ensure baseline is loaded for dynamic challenges
+  if (c.mode === 'dynamic' && !logState.baseline) {
+    try {
+      const bSnap = await getDoc(doc(db, 'challenges', c.id, 'baselines', currentUser.uid));
+      logState.baseline = bSnap.exists() ? bSnap.data() : null;
+    } catch (err) { console.error('Baseline load error:', err); }
+  }
+
+  // Ensure entries are loaded for weekly cap calculation
+  if (!logState.entries || Object.keys(logState.entries).length === 0) {
+    try {
+      const eSnap = await getDocs(query(
+        collection(db, 'activityLogs'),
+        where('challengeId', '==', c.id),
+        where('userId', '==', currentUser.uid)
+      ));
+      logState.entries = {};
+      eSnap.forEach(d => { logState.entries[d.data().date] = { id: d.id, ...d.data() }; });
+    } catch (err) { console.error('Entries load error:', err); }
+  }
+
   const existing = logState.entries[dateStr] || null;
   logState.activeDate  = dateStr;
-  logState.workoutType = existing?.workout?.type || null;
+  logState.workoutType = null;
 
   // Set modal title and date
   const d = new Date(dateStr + 'T00:00:00');
@@ -1498,28 +1521,26 @@ function openLogModal(dateStr) {
   // Existing entry note
   document.getElementById('existingEntryNote').textContent = existing ? '⚠️ Saving will replace your existing entry for this date' : '';
 
-  // Render metric sections inside modal
+  // Render metric sections
   const sectionsEl = document.getElementById('metricSections');
   sectionsEl.innerHTML = metrics.map(m => renderMetricSection(m, c, dateStr, existing)).join('');
   document.getElementById('pointsPreview').style.display = 'none';
 
-  // Always clear all inputs first to avoid stale data from previous modal open
+  // Always clear inputs first to avoid stale data from previous modal
   ['log_workout_done','log_steps','log_sleep','log_water',
    'log_calories','log_protein','log_carbs','log_fat'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
-  logState.workoutType = null;
 
-  // Then populate with existing data if available
+  // Populate with existing data if available
   if (existing) {
     logState.workoutType = existing?.workout?.type || null;
     populateExistingEntry(existing, metrics);
   }
 
   attachLogListeners(metrics, c, dateStr);
-  // Only calculate points if there's existing data — prevents ghost preview
   if (existing) updatePointsPreview(metrics, c, dateStr);
 
   logModal.classList.add('active');
