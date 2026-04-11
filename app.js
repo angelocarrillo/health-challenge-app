@@ -101,6 +101,7 @@ function showPage(name) {
   document.querySelector(`.mobile-nav-item[data-page="${name}"]`)?.classList.add('active');
   if (name === 'log')       refreshLogPage();
   if (name === 'analytics') populateAnalyticsSelector();
+  if (name === 'dashboard') refreshHomePage();
 }
 
 // Wire up mobile nav buttons
@@ -529,6 +530,15 @@ const ALL_METRICS = ['workout','steps','sleep','water','macros'];
 let homeVisibleMetrics = JSON.parse(localStorage.getItem('fw-home-metrics') || 'null') || ALL_METRICS;
 let homeWorkoutType = null;
 let homeChallenges  = []; // active + recently ended challenges user is in
+
+// Called every time user navigates to home — re-fetches fresh data
+async function refreshHomePage() {
+  if (!currentUser || homeChallenges.length === 0) return;
+  // Force re-fetch by clearing cached entries so renderHomeMetricSections re-fetches
+  logState.entries  = {};
+  logState.baseline = null;
+  await renderHomeMetricSections();
+}
 
 async function loadDashboard() {
   if (!currentUser) return;
