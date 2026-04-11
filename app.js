@@ -735,10 +735,18 @@ async function renderHomeMetricSections() {
   const inputIds = ['log_workout_done','log_steps','log_sleep','log_water','log_calories','log_protein','log_carbs','log_fat'];
   document.querySelectorAll('.workout-type-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      const isActive = btn.classList.contains('active');
       document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      homeWorkoutType = btn.dataset.type;
-      logState.workoutType = homeWorkoutType;
+      if (!isActive) {
+        btn.classList.add('active');
+        homeWorkoutType = btn.dataset.type;
+        logState.workoutType = homeWorkoutType;
+        setInputVal('log_workout_done', 'yes');
+      } else {
+        homeWorkoutType = null;
+        logState.workoutType = null;
+        setInputVal('log_workout_done', 'no');
+      }
       updateHomePointsPreview(metricsToShow, repChallenge, dateStr);
     });
   });
@@ -904,7 +912,7 @@ function updateHomePointsPreview(metrics, challenge, dateStr) {
 document.getElementById('homeClearBtn')?.addEventListener('click', () => {
   ['log_workout_done','log_steps','log_sleep','log_water','log_calories','log_protein','log_carbs','log_fat']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#homeMetricSections .workout-type-btn').forEach(b => b.classList.remove('active'));
   homeWorkoutType = null;
   logState.workoutType = null;
   document.getElementById('homePointsPreview').style.display = 'none';
@@ -1898,21 +1906,15 @@ function renderMetricSection(metric, challenge, dateStr, existing, hideIcon = fa
   if (metric === 'workout') {
     body = `
       <div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;">Workout Type</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-weight:600;">Select Workout Type</div>
         <div class="workout-type-selector">
           <button type="button" class="workout-type-btn" data-type="strength">💪 Strength</button>
           <button type="button" class="workout-type-btn" data-type="running">🏃 Running Sport</button>
           <button type="button" class="workout-type-btn" data-type="nonrunning">🏊 Non-Running Sport</button>
         </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:10px;text-align:center;">Selecting a type marks your workout as complete. Tap again to deselect.</div>
       </div>
-      <div class="log-input-row">
-        <label>Did you complete a workout?</label>
-        <select id="log_workout_done" class="input" style="max-width:140px;">
-          <option value="">Select</option>
-          <option value="yes">✅ Yes</option>
-          <option value="no">❌ No</option>
-        </select>
-      </div>`;
+      <input type="hidden" id="log_workout_done" value=""/>`;
   } else if (metric === 'steps') {
     body = `
       <div class="log-input-row">
@@ -2145,12 +2147,20 @@ function populateExistingEntry(entry, metrics) {
 //  ATTACH LOG LISTENERS
 // ============================================================
 function attachLogListeners(metrics, challenge, dateStr) {
-  // Workout type buttons
+  // Workout type buttons — selecting sets done=yes, clicking active again deselects
   document.querySelectorAll('.workout-type-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      const isActive = btn.classList.contains('active');
       document.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      logState.workoutType = btn.dataset.type;
+      if (!isActive) {
+        btn.classList.add('active');
+        logState.workoutType = btn.dataset.type;
+        setInputVal('log_workout_done', 'yes');
+      } else {
+        // Deselect — no workout
+        logState.workoutType = null;
+        setInputVal('log_workout_done', 'no');
+      }
       updatePointsPreview(metrics, challenge, dateStr);
     });
   });
@@ -2170,6 +2180,7 @@ function attachLogListeners(metrics, challenge, dateStr) {
     inputIds.forEach(id => { const el = container.querySelector(`#${id}`); if (el) el.value = ''; });
     container.querySelectorAll('.workout-type-btn').forEach(b => b.classList.remove('active'));
     logState.workoutType = null;
+    setInputVal('log_workout_done', '');
     updatePointsPreview(metrics, challenge, dateStr);
   };
 
