@@ -1303,9 +1303,17 @@ async function refreshLogPage() {
       endedOpts.forEach(o => grp.appendChild(o));
       select.appendChild(grp);
     }
+    // If there was a previous selection, restore it
+    // Otherwise auto-select the most recently created challenge (first active, else first ended)
     if (prev && [...select.options].some(o => o.value === prev)) {
       select.value = prev;
       await onChallengeSelected(prev);
+    } else {
+      const firstOption = activeOpts[0] || endedOpts[0];
+      if (firstOption) {
+        select.value = firstOption.value;
+        await onChallengeSelected(firstOption.value);
+      }
     }
   } catch (err) { console.error(err); }
 }
