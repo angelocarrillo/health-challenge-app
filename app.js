@@ -656,9 +656,10 @@ async function renderHomeMetricSections() {
     el.classList.add('metric-section-animate');
   });
 
-  // Pre-fill existing values if editing
+  // Pre-fill existing values — use ALL_METRICS so every visible field gets populated
+  // regardless of which metrics the challenge tracks
   if (homeExistingEntry) {
-    populateExistingEntry(homeExistingEntry, metricsToShow);
+    populateExistingEntry(homeExistingEntry, ALL_METRICS);
   }
 
   // Show existing entry note
@@ -1902,29 +1903,27 @@ function setInputVal(id, value) {
 }
 
 function populateExistingEntry(entry, metrics) {
-  if (metrics.includes('workout')) {
-    if (entry.workout?.done) setInputVal('log_workout_done', entry.workout.done);
-    if (entry.workout?.type) {
-      logState.workoutType = entry.workout.type;
-      // Scope workout type buttons to active modal or home sections
-      const modal = document.getElementById('logEntryModal');
-      const container = modal?.classList.contains('active')
-        ? modal
-        : (document.getElementById('homeMetricSections') || document);
-      container.querySelectorAll('.workout-type-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.type === entry.workout.type);
-      });
-    }
+  // Always try to populate workout regardless of metrics list —
+  // the input simply won't exist in DOM if metric isn't shown, so setInputVal is a no-op
+  if (entry.workout?.done) setInputVal('log_workout_done', entry.workout.done);
+  if (entry.workout?.type) {
+    logState.workoutType = entry.workout.type;
+    homeWorkoutType = entry.workout.type;
+    const modal = document.getElementById('logEntryModal');
+    const container = modal?.classList.contains('active')
+      ? modal
+      : (document.getElementById('homeMetricSections') || document);
+    container.querySelectorAll('.workout-type-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.type === entry.workout.type);
+    });
   }
-  if (metrics.includes('steps')  && entry.steps  != null) setInputVal('log_steps',    entry.steps);
-  if (metrics.includes('sleep')  && entry.sleep  != null) setInputVal('log_sleep',    entry.sleep);
-  if (metrics.includes('water')  && entry.water  != null) setInputVal('log_water',    entry.water);
-  if (metrics.includes('macros')) {
-    if (entry.macros?.calories != null) setInputVal('log_calories', entry.macros.calories);
-    if (entry.macros?.protein  != null) setInputVal('log_protein',  entry.macros.protein);
-    if (entry.macros?.carbs    != null) setInputVal('log_carbs',    entry.macros.carbs);
-    if (entry.macros?.fat      != null) setInputVal('log_fat',      entry.macros.fat);
-  }
+  if (entry.steps  != null) setInputVal('log_steps',    entry.steps);
+  if (entry.sleep  != null) setInputVal('log_sleep',    entry.sleep);
+  if (entry.water  != null) setInputVal('log_water',    entry.water);
+  if (entry.macros?.calories != null) setInputVal('log_calories', entry.macros.calories);
+  if (entry.macros?.protein  != null) setInputVal('log_protein',  entry.macros.protein);
+  if (entry.macros?.carbs    != null) setInputVal('log_carbs',    entry.macros.carbs);
+  if (entry.macros?.fat      != null) setInputVal('log_fat',      entry.macros.fat);
 }
 
 // ============================================================
@@ -2163,17 +2162,36 @@ async function submitLog(metrics, challenge, dateStr) {
     const docId = `${challenge.id}_${currentUser.uid}_${dateStr}`;
 
     if (!hasAnyData) {
-      // Delete the entry if it exists
       await deleteDoc(doc(db, 'activityLogs', docId)).catch(() => {});
       delete logState.entries[dateStr];
+      // Also clear personal log for this date
+      await deleteDoc(doc(db, 'personalLogs', `${currentUser.uid}_${dateStr}`)).catch(() => {});
     } else {
       await setDoc(doc(db, 'activityLogs', docId), entryData);
       logState.entries[dateStr] = { id: docId, ...entryData };
+
+      // Sync to personalLogs so home page stays in sync
+      const personalEntry = {
+        userId:    currentUser.uid,
+        date:      dateStr,
+        updatedAt: serverTimestamp(),
+        workout:   entryData.workout  || null,
+        steps:     entryData.steps    ?? null,
+        sleep:     entryData.sleep    ?? null,
+        water:     entryData.water    ?? null,
+        macros:    entryData.macros   || null,
+      };
+      await setDoc(doc(db, 'personalLogs', `${currentUser.uid}_${dateStr}`), personalEntry);
     }
 
     // Close modal and refresh calendar
     closeLogModal();
     renderCalendar();
+
+    // Also refresh home page week picker if it's visible
+    if (document.getElementById('weekPicker')) {
+      renderWeekPicker();
+    }
 
   } catch (err) {
     console.error(err);
