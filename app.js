@@ -218,7 +218,11 @@ document.querySelectorAll('.tab').forEach(tab => {
 // ============================================================
 //  PAYOUT CALCULATOR
 // ============================================================
-let firstSplitPct = 65;
+let firstSplitPct = 65; // legacy, kept for backward compat
+
+// New flexible payout: stores either dollar amounts or percentages per place
+let payoutMode = 'percent'; // 'percent' | 'dollar'
+let payoutValues = { first: 60, second: 30, third: 10 }; // percents or dollars
 
 function calcPayout(wager, participants, firstPct = firstSplitPct) {
   const secondPct = 100 - firstPct;
@@ -230,6 +234,23 @@ function calcPayout(wager, participants, firstPct = firstSplitPct) {
   return { total, remaining, first, second, third, firstPct, secondPct };
 }
 
+function calcFlexPayout(wager, participants, payoutConfig) {
+  const total = Math.round(wager * participants * 100) / 100;
+  const mode  = payoutConfig?.mode || 'percent';
+  const vals  = payoutConfig?.values || { first: 60, second: 30, third: 10 };
+  let first, second, third;
+  if (mode === 'dollar') {
+    first  = vals.first  || 0;
+    second = vals.second || 0;
+    third  = vals.third  || 0;
+  } else {
+    first  = Math.round(total * ((vals.first  || 0) / 100) * 100) / 100;
+    second = Math.round(total * ((vals.second || 0) / 100) * 100) / 100;
+    third  = Math.round(total * ((vals.third  || 0) / 100) * 100) / 100;
+  }
+  return { total, first, second, third, mode, vals };
+}
+
 function updatePayoutPreview() {
   const wager   = parseFloat(document.getElementById('challengeWager').value) || 0;
   const preview = document.getElementById('payoutPreview');
@@ -237,54 +258,84 @@ function updatePayoutPreview() {
     preview.innerHTML = '<span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>';
     return;
   }
-  const counts  = [2, 3, 4, 5, 6];
-  const cur     = firstSplitPct;
-  const sec     = 100 - cur;
-  const rows    = counts.map(n => {
-    const p = calcPayout(wager, n, cur);
+
+  const mode = payoutMode;
+  const vals = payoutValues;
+  const unit = mode === 'percent' ? '%' : '$';
+
+  // Validation warning
+  const total10 = Math.round(wager * 10 * 100) / 100; // example with 10 people
+  let warning = '';
+  if (mode === 'percent') {
+    const sum = (vals.first || 0) + (vals.second || 0) + (vals.third || 0);
+    if (Math.round(sum) !== 100) warning = `⚠️ Percentages add up to ${sum}% — should total 100%`;
+  } else {
+    const pot10 = total10;
+    const sum   = (vals.first || 0) + (vals.second || 0) + (vals.third || 0);
+    if (sum > pot10) warning = `⚠️ Prize total ($${sum}) exceeds pot for 10 people ($${pot10})`;
+  }
+
+  // Preview table for different participant counts
+  const counts = [2, 3, 4, 5, 6, 8, 10];
+  const rows = counts.map(n => {
+    const p = calcFlexPayout(wager, n, { mode, values: vals });
     return `<tr style="border-bottom:1px solid var(--border);">
-      <td style="padding:7px 8px;color:var(--text2);font-size:13px;">${n} people</td>
+      <td style="padding:7px 8px;color:var(--text2);font-size:13px;">${n}</td>
       <td style="padding:7px 8px;font-weight:600;color:var(--accent);font-family:'Syne',sans-serif;">$${p.total}</td>
       <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.first}</td>
       <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.second}</td>
       <td style="padding:7px 8px;color:var(--text);font-weight:600;">$${p.third}</td>
     </tr>`;
   }).join('');
+
   preview.innerHTML = `
-    <div style="margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;">1st / 2nd Split of Remaining Pot</span>
-        <button type="button" id="resetSplitBtn" style="font-size:11px;color:var(--accent2);background:none;border:none;cursor:pointer;padding:0;">Reset to 65/35</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:13px;color:var(--text2);">🥇 1st</span>
-        <input type="range" id="splitSlider" min="50" max="90" step="5" value="${cur}" style="flex:1;accent-color:var(--accent);cursor:pointer;"/>
-        <span style="font-size:13px;color:var(--text2);">🥈 2nd</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:6px;">
-        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent);">${cur}%</span>
-        <span style="font-size:11px;color:var(--text3);align-self:center;">of remaining after 3rd</span>
-        <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent2);">${sec}%</span>
-      </div>
+    <!-- Mode toggle -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button type="button" id="payoutModePercent" class="btn-${mode==='percent'?'primary':'secondary'}" style="flex:1;padding:8px;font-size:13px;">% Percentage</button>
+      <button type="button" id="payoutModeDollar"  class="btn-${mode==='dollar' ?'primary':'secondary'}" style="flex:1;padding:8px;font-size:13px;">$ Dollar Amount</button>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">🥉 3rd always gets <strong style="color:var(--text);">$${wager}</strong> back · Payouts update live as people join</div>
+    <!-- Prize inputs -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
+      ${['first','second','third'].map((place, i) => `
+        <div>
+          <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px;">${['🥇 1st','🥈 2nd','🥉 3rd'][i]}</label>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-size:13px;color:var(--text2);">${mode==='dollar'?'$':''}</span>
+            <input type="number" id="payout_${place}" class="input" value="${vals[place]||''}" min="0" step="${mode==='percent'?'1':'5'}" placeholder="0" style="padding:8px;font-size:14px;" inputmode="numeric"/>
+            <span style="font-size:13px;color:var(--text2);">${mode==='percent'?'%':''}</span>
+          </div>
+        </div>`).join('')}
+    </div>
+    ${warning ? `<div style="font-size:12px;color:var(--warn);margin-bottom:12px;">${warning}</div>` : ''}
+    <!-- Preview table -->
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">Preview across participant counts:</div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr style="border-bottom:1px solid var(--border);">
-          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Participants</th>
-          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Pot</th>
-          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥇 1st</th>
-          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥈 2nd</th>
-          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">🥉 3rd</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;">People</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;">Pot</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;">🥇</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;">🥈</th>
+          <th style="padding:6px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;">🥉</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
-  document.getElementById('splitSlider')?.addEventListener('input', (e) => {
-    firstSplitPct = parseInt(e.target.value); updatePayoutPreview();
+
+  // Wire up mode buttons
+  document.getElementById('payoutModePercent')?.addEventListener('click', () => {
+    payoutMode = 'percent'; payoutValues = { first: 60, second: 30, third: 10 }; updatePayoutPreview();
   });
-  document.getElementById('resetSplitBtn')?.addEventListener('click', () => {
-    firstSplitPct = 65; updatePayoutPreview();
+  document.getElementById('payoutModeDollar')?.addEventListener('click', () => {
+    payoutMode = 'dollar'; payoutValues = { first: 0, second: 0, third: 0 }; updatePayoutPreview();
+  });
+
+  // Wire up prize inputs
+  ['first','second','third'].forEach(place => {
+    document.getElementById(`payout_${place}`)?.addEventListener('input', (e) => {
+      payoutValues[place] = parseFloat(e.target.value) || 0;
+      updatePayoutPreview();
+    });
   });
 }
 document.getElementById('challengeWager').addEventListener('input', updatePayoutPreview);
@@ -364,6 +415,8 @@ function closeCreateModal() {
   document.getElementById('payoutPreview').innerHTML = '<span style="color:var(--text3)">Enter wager amount to see payout breakdown</span>';
   document.getElementById('classicPointConfig').style.display = 'none';
   firstSplitPct = 65;
+  payoutMode = 'percent';
+  payoutValues = { first: 60, second: 30, third: 10 };
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
   document.querySelector('.mode-card[data-mode="dynamic"]').classList.add('active');
   document.getElementById('challengeMode').value = 'dynamic';
@@ -420,7 +473,7 @@ document.getElementById('createChallengeForm').addEventListener('submit', async 
     const challengeData = {
       name, startDate, endDate, wager, mode, metrics,
       inviteCode: generateCode(),
-      payout: { firstSplitPct },
+      payout: { firstSplitPct, mode: payoutMode, values: payoutValues },
       classicPoints: mode === 'classic' ? classicPoints : {},
       adminId:   currentUser.uid,
       adminName: currentUser.displayName || currentUser.email,
@@ -1033,11 +1086,106 @@ const detailModal = document.getElementById('challengeDetailModal');
 document.getElementById('closeDetailModal').addEventListener('click', () => detailModal.classList.remove('active'));
 detailModal.addEventListener('click', (e) => { if (e.target === detailModal) detailModal.classList.remove('active'); });
 
+// Edit payout — shown inline in the detail modal for admins
+detailModal.addEventListener('click', async (e) => {
+  if (!e.target.matches('#editPayoutBtn')) return;
+  const body = document.getElementById('payoutDisplayArea');
+  const c = detailModal._challenge;
+  if (!c) return;
+  const cfg = c.payout?.mode
+    ? { mode: c.payout.mode, values: { ...c.payout.values } }
+    : { mode: 'percent', values: { first: 60, second: 30, third: 10 } };
+
+  body.innerHTML = `
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button type="button" id="editPayoutModePercent" class="btn-${cfg.mode==='percent'?'primary':'secondary'}" style="flex:1;padding:8px;font-size:13px;">% Percentage</button>
+        <button type="button" id="editPayoutModeDollar"  class="btn-${cfg.mode==='dollar' ?'primary':'secondary'}" style="flex:1;padding:8px;font-size:13px;">$ Dollar</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
+        ${['first','second','third'].map((place,i) => `
+          <div>
+            <label style="font-size:11px;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:6px;">${['🥇 1st','🥈 2nd','🥉 3rd'][i]}</label>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="color:var(--text2);font-size:13px;">${cfg.mode==='dollar'?'$':''}</span>
+              <input type="number" id="editPayout_${place}" class="input" value="${cfg.values[place]||0}" min="0" style="padding:8px;" inputmode="numeric"/>
+              <span style="color:var(--text2);font-size:13px;">${cfg.mode==='percent'?'%':''}</span>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div id="editPayoutWarning" style="font-size:12px;color:var(--warn);margin-bottom:12px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-secondary" id="cancelEditPayoutBtn" style="flex:1;">Cancel</button>
+        <button class="btn-primary"   id="saveEditPayoutBtn"   style="flex:1;">Save Prizes 🔒</button>
+      </div>
+    </div>`;
+
+  function validateEdit() {
+    const mode = body.dataset.mode || cfg.mode;
+    const vals = {
+      first:  parseFloat(document.getElementById('editPayout_first')?.value)  || 0,
+      second: parseFloat(document.getElementById('editPayout_second')?.value) || 0,
+      third:  parseFloat(document.getElementById('editPayout_third')?.value)  || 0,
+    };
+    const warn = document.getElementById('editPayoutWarning');
+    if (mode === 'percent') {
+      const sum = vals.first + vals.second + vals.third;
+      warn.textContent = Math.round(sum) !== 100 ? `⚠️ Percentages total ${Math.round(sum)}% — should be 100%` : '';
+    } else {
+      const count = (c.participants || []).length;
+      const pot = c.wager * count;
+      const sum = vals.first + vals.second + vals.third;
+      warn.textContent = sum > pot ? `⚠️ Prize total ($${sum}) exceeds pot ($${pot})` : '';
+    }
+  }
+
+  body.dataset.mode = cfg.mode;
+  ['first','second','third'].forEach(p => {
+    document.getElementById(`editPayout_${p}`)?.addEventListener('input', validateEdit);
+  });
+
+  body.querySelector('#editPayoutModePercent')?.addEventListener('click', () => {
+    body.dataset.mode = 'percent';
+    body.querySelector('#editPayoutModePercent').className = 'btn-primary';
+    body.querySelector('#editPayoutModeDollar').className  = 'btn-secondary';
+    validateEdit();
+  });
+  body.querySelector('#editPayoutModeDollar')?.addEventListener('click', () => {
+    body.dataset.mode = 'dollar';
+    body.querySelector('#editPayoutModeDollar').className  = 'btn-primary';
+    body.querySelector('#editPayoutModePercent').className = 'btn-secondary';
+    validateEdit();
+  });
+
+  body.querySelector('#cancelEditPayoutBtn')?.addEventListener('click', () => showChallengeDetail(c.id, c));
+
+  body.querySelector('#saveEditPayoutBtn')?.addEventListener('click', async () => {
+    const mode = body.dataset.mode;
+    const vals = {
+      first:  parseFloat(document.getElementById('editPayout_first')?.value)  || 0,
+      second: parseFloat(document.getElementById('editPayout_second')?.value) || 0,
+      third:  parseFloat(document.getElementById('editPayout_third')?.value)  || 0,
+    };
+    try {
+      await updateDoc(doc(db, 'challenges', c.id), { 'payout.mode': mode, 'payout.values': vals });
+      c.payout = { ...c.payout, mode, values: vals };
+      detailModal._challenge = c;
+      showChallengeDetail(c.id, c);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save prizes. Please try again.');
+    }
+  });
+});
+
 function showChallengeDetail(id, c) {
+  detailModal._challenge = c;
   const isAdmin  = c.adminId === currentUser?.uid;
   const count    = (c.participants || []).length;
-  const splitPct = c.payout?.firstSplitPct ?? 65;
-  const p        = calcPayout(c.wager, count, splitPct);
+  const payoutCfg = c.payout?.mode
+    ? { mode: c.payout.mode, values: c.payout.values }
+    : { mode: 'percent', values: { first: c.payout?.firstSplitPct ? Math.round(c.payout.firstSplitPct * (1 - 1/count) * 100)/100 : 60, second: 30, third: 10 } };
+  const p        = calcFlexPayout(c.wager, count, payoutCfg);
   const daysLeft = Math.max(0, Math.ceil((new Date(c.endDate) - new Date()) / 86400000));
   const metrics  = c.metrics || ['workout','steps'];
 
@@ -1070,21 +1218,26 @@ function showChallengeDetail(id, c) {
     </div>` : ''}
 
     <div style="margin-bottom:20px;">
-      <div class="section-title" style="margin-top:0;">Live Payout · ${count} participant${count !== 1 ? 's' : ''} · $${p.total} pot</div>
-      <div class="payout-preview">
-        <div class="payout-row" style="margin-bottom:8px;">
-          <span class="payout-place">🥇 1st Place</span>
-          <div style="text-align:right;"><span class="payout-amount">$${p.first}</span><div style="font-size:11px;color:var(--text3);">${p.firstPct}% of remaining pot</div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div class="section-title" style="margin-top:0;">Live Payout · ${count} participant${count !== 1 ? 's' : ''} · $${p.total} pot</div>
+        ${isAdmin ? `<button class="btn-secondary" id="editPayoutBtn" style="font-size:12px;padding:6px 12px;">✏️ Edit Prizes</button>` : ''}
+      </div>
+      <div id="payoutDisplayArea">
+        <div class="payout-preview">
+          <div class="payout-row" style="margin-bottom:8px;">
+            <span class="payout-place">🥇 1st Place</span>
+            <div style="text-align:right;"><span class="payout-amount">$${p.first}</span><div style="font-size:11px;color:var(--text3);">${payoutCfg.mode === 'percent' ? payoutCfg.values.first + '% of pot' : 'fixed amount'}</div></div>
+          </div>
+          <div class="payout-row" style="margin-bottom:8px;">
+            <span class="payout-place">🥈 2nd Place</span>
+            <div style="text-align:right;"><span class="payout-amount">$${p.second}</span><div style="font-size:11px;color:var(--text3);">${payoutCfg.mode === 'percent' ? payoutCfg.values.second + '% of pot' : 'fixed amount'}</div></div>
+          </div>
+          <div class="payout-row">
+            <span class="payout-place">🥉 3rd Place</span>
+            <div style="text-align:right;"><span class="payout-amount">$${p.third}</span><div style="font-size:11px;color:var(--text3);">${payoutCfg.mode === 'percent' ? payoutCfg.values.third + '% of pot' : 'fixed amount'}</div></div>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);">💡 Amounts update as more participants join</div>
         </div>
-        <div class="payout-row" style="margin-bottom:8px;">
-          <span class="payout-place">🥈 2nd Place</span>
-          <div style="text-align:right;"><span class="payout-amount">$${p.second}</span><div style="font-size:11px;color:var(--text3);">${p.secondPct}% of remaining pot</div></div>
-        </div>
-        <div class="payout-row">
-          <span class="payout-place">🥉 3rd Place</span>
-          <div style="text-align:right;"><span class="payout-amount">$${p.third}</span><div style="font-size:11px;color:var(--text3);">Wager returned (breaks even)</div></div>
-        </div>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);">💡 Amounts update automatically as more participants join</div>
       </div>
     </div>
 
@@ -2418,7 +2571,10 @@ async function renderLeaderboard(challengeId) {
   })).sort((a, b) => b.points - a.points || b.days - a.days);
 
   const rankEmoji = ['🥇','🥈','🥉'];
-  const p = calcPayout(challenge.wager, ranked.length, challenge.payout?.firstSplitPct ?? 65);
+  const _payoutCfg = challenge.payout?.mode
+    ? { mode: challenge.payout.mode, values: challenge.payout.values }
+    : { mode: 'percent', values: { first: 60, second: 30, third: 10 } };
+  const p = calcFlexPayout(challenge.wager, ranked.length, _payoutCfg);
 
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
@@ -2830,8 +2986,10 @@ async function renderHistory() {
 
       const me     = ranked.find(p => p.uid === currentUser.uid);
       const myRank = ranked.indexOf(me) + 1;
-      const splitPct = c.payout?.firstSplitPct ?? 65;
-      const payout   = calcPayout(c.wager, ranked.length, splitPct);
+      const _histPayoutCfg = c.payout?.mode
+        ? { mode: c.payout.mode, values: c.payout.values }
+        : { mode: 'percent', values: { first: 60, second: 30, third: 10 } };
+      const payout = calcFlexPayout(c.wager, ranked.length, _histPayoutCfg);
       const rankEmoji = ['🥇','🥈','🥉'];
       const totalDays = Math.ceil((new Date(c.endDate) - new Date(c.startDate)) / 86400000);
       const myPct     = totalDays > 0 ? Math.round((me?.days || 0) / totalDays * 100) : 0;
