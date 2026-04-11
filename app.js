@@ -2256,8 +2256,12 @@ function switchAnalyticsTab(tabName) {
   // Keep dropdown in sync
   const sel = document.getElementById('analyticsTabSelect');
   if (sel) sel.value = tabName;
+  // Show challenge selector only for tabs that need it
+  const needsChallenge = ['leaderboard','progress','history'].includes(tabName);
+  document.getElementById('analyticsChallengeSelector').style.display = needsChallenge ? 'block' : 'none';
   const cid = document.getElementById('analyticsChallengeSelect').value;
-  if (cid) renderAnalyticsTab(tabName, cid);
+  if (needsChallenge && cid) renderAnalyticsTab(tabName, cid);
+  if (!needsChallenge) renderAnalyticsTab(tabName, null);
 }
 
 // Desktop tab buttons
