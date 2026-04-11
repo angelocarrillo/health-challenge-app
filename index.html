@@ -194,12 +194,6 @@
       <div class="page-header">
         <div><h2 class="page-title">Analytics</h2><p class="page-sub">Challenge insights and leaderboard</p></div>
       </div>
-      <div id="analyticsChallengeSelector" class="form-group" style="max-width:420px;margin-bottom:28px;display:none;">
-        <label>Select Challenge</label>
-        <select id="analyticsChallengeSelect" class="input">
-          <option value="">— Choose a challenge —</option>
-        </select>
-      </div>
       <div id="analyticsContainer" style="display:none;">
         <!-- View toggle -->
         <div class="tab-bar analytics-tab-bar" style="margin-bottom:28px;">
@@ -215,6 +209,14 @@
           <option value="progress">📈 Progress</option>
           <option value="history">🕘 History</option>
         </select>
+
+        <!-- Challenge selector — shown below tabs for Leaderboard/Progress/History -->
+        <div id="analyticsChallengeSelector" class="form-group" style="max-width:420px;margin-bottom:28px;display:none;">
+          <label>Select Challenge</label>
+          <select id="analyticsChallengeSelect" class="input">
+            <option value="">— Choose a challenge —</option>
+          </select>
+        </div>
 
         <!-- LEADERBOARD -->
         <div id="atab-leaderboard" class="atab-content">
