@@ -925,6 +925,9 @@ select.input { cursor:pointer; }
   font-weight: 700;
   margin-bottom: 20px;
   color: var(--text);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* Leaderboard */

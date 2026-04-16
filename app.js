@@ -2741,7 +2741,7 @@ async function renderProgressCharts(challengeId) {
     const card = document.createElement('div');
     card.className = 'chart-card';
     card.style.marginBottom = '20px';
-    card.innerHTML = `<div class="chart-title">⭐ Point Progression</div><canvas id="prog_points" height="100"></canvas>`;
+    card.innerHTML = `<div class="chart-title">Point Progression</div><canvas id="prog_points" height="100"></canvas>`;
     container.appendChild(card);
 
     const dateLabels = allDates.map(d =>
@@ -2812,7 +2812,7 @@ async function renderProgressCharts(challengeId) {
     const card = document.createElement('div');
     card.className = 'chart-card';
     card.style.marginBottom = '20px';
-    card.innerHTML = `<div class="chart-title">💪 Workouts Per Week</div><canvas id="prog_workout" height="100"></canvas>`;
+    card.innerHTML = `<div class="chart-title">Workouts Per Week</div><canvas id="prog_workout" height="100"></canvas>`;
     container.appendChild(card);
 
     const datasets = participants.map((p, i) => ({
@@ -2853,7 +2853,7 @@ async function renderProgressCharts(challengeId) {
     const card = document.createElement('div');
     card.className = 'chart-card';
     card.style.marginBottom = '20px';
-    card.innerHTML = `<div class="chart-title">👟 Steps Per Day</div><canvas id="prog_steps" height="100"></canvas>`;
+    card.innerHTML = `<div class="chart-title">Steps Per Day</div><canvas id="prog_steps" height="100"></canvas>`;
     container.appendChild(card);
 
     const datasets = participants.map((p, i) => ({
@@ -2884,7 +2884,7 @@ async function renderProgressCharts(challengeId) {
     const card = document.createElement('div');
     card.className = 'chart-card';
     card.style.marginBottom = '20px';
-    card.innerHTML = `<div class="chart-title">😴 Sleep Per Night (hours)</div><canvas id="prog_sleep" height="100"></canvas>`;
+    card.innerHTML = `<div class="chart-title">Sleep Per Night (hours)</div><canvas id="prog_sleep" height="100"></canvas>`;
     container.appendChild(card);
 
     const datasets = participants.map((p, i) => ({
@@ -2914,7 +2914,7 @@ async function renderProgressCharts(challengeId) {
     const card = document.createElement('div');
     card.className = 'chart-card';
     card.style.marginBottom = '20px';
-    card.innerHTML = `<div class="chart-title">💧 Water Per Day (cups)</div><canvas id="prog_water" height="100"></canvas>`;
+    card.innerHTML = `<div class="chart-title">Water Per Day (cups)</div><canvas id="prog_water" height="100"></canvas>`;
     container.appendChild(card);
 
     const datasets = participants.map((p, i) => ({
@@ -3296,7 +3296,7 @@ async function renderPersonalCharts() {
       const card = document.createElement('div');
       card.className = 'chart-card';
       card.style.marginBottom = '20px';
-      card.innerHTML = `<div class="chart-title">💪 Workouts Per Week</div><canvas id="pers_workout" height="100"></canvas>`;
+      card.innerHTML = `<div class="chart-title">Workouts Per Week</div><canvas id="pers_workout" height="100"></canvas>`;
       container.appendChild(card);
       const wkOpts = {
         ...baseOpts('Workouts'),
@@ -3315,21 +3315,21 @@ async function renderPersonalCharts() {
     // ---- STEPS dotted line ----
     const stepsData = logs.map(l => l.steps ?? null);
     if (stepsData.some(v => v !== null)) {
-      addChart('pers_steps', '👟 Steps Per Day', 'line',
+      addChart('pers_steps', 'Steps Per Day', 'line',
         [dottedDataset(stepsData, '#7c6dfa', 'Steps')], baseOpts('Steps'));
     }
 
     // ---- SLEEP dotted line ----
     const sleepData = logs.map(l => l.sleep ?? null);
     if (sleepData.some(v => v !== null)) {
-      addChart('pers_sleep', '😴 Sleep Per Night', 'line',
+      addChart('pers_sleep', 'Sleep Per Night', 'line',
         [dottedDataset(sleepData, '#38bdf8', 'Hours')], baseOpts('Hours'));
     }
 
     // ---- WATER dotted line ----
     const waterData = logs.map(l => l.water ?? null);
     if (waterData.some(v => v !== null)) {
-      addChart('pers_water', '💧 Water Per Day', 'line',
+      addChart('pers_water', 'Water Per Day', 'line',
         [dottedDataset(waterData, '#00e5a0', 'Cups')], baseOpts('Cups'));
     }
 
@@ -3341,7 +3341,7 @@ async function renderPersonalCharts() {
       const card = document.createElement('div');
       card.className = 'chart-card';
       card.style.marginBottom = '20px';
-      card.innerHTML = `<div class="chart-title">🥗 Macros Per Day (grams)</div><canvas id="pers_macros" height="100"></canvas>`;
+      card.innerHTML = `<div class="chart-title">Macros Per Day (grams)</div><canvas id="pers_macros" height="100"></canvas>`;
       container.appendChild(card);
       const macroOpts = {
         ...baseOpts('Grams'),
