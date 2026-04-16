@@ -2736,6 +2736,76 @@ async function renderProgressCharts(challengeId) {
     }
   });
 
+  // ---- POINT PROGRESSION cumulative line-dot chart ----
+  {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.style.marginBottom = '20px';
+    card.innerHTML = `<div class="chart-title">⭐ Point Progression</div><canvas id="prog_points" height="100"></canvas>`;
+    container.appendChild(card);
+
+    const dateLabels = allDates.map(d =>
+      new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    );
+
+    const datasets = participants.map((p, i) => {
+      let cumulative = 0;
+      const data = allDates.map(d => {
+        const entry = logs.find(l => l.userId === p.uid && l.date === d);
+        if (entry) cumulative += entry.points || 0;
+        return entry ? Math.round(cumulative * 100) / 100 : null;
+      });
+      return {
+        label: getDisplayName(p),
+        data,
+        borderColor:         CHART_COLORS[i % CHART_COLORS.length],
+        backgroundColor:     CHART_COLORS[i % CHART_COLORS.length] + '22',
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointBackgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        tension: 0.35,
+        fill: false,
+        spanGaps: true,
+      };
+    });
+
+    const pointProgressOpts = {
+      responsive: true,
+      maintainAspectRatio: !isMobile,
+      plugins: {
+        legend: {
+          position: isMobile ? 'bottom' : 'top',
+          labels: { color: textColor, font: { family: 'DM Sans', size: isMobile ? 10 : 12 }, usePointStyle: true, pointStyleWidth: 8, boxHeight: 8 }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y} pts`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, maxTicksLimit: isMobile ? 6 : 12, maxRotation: 45, font: { size: isMobile ? 9 : 11 } }
+        },
+        y: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { size: isMobile ? 9 : 11 } },
+          beginAtZero: true,
+          title: { display: !isMobile, text: 'Cumulative Points', color: textColor, font: { size: 11 } }
+        }
+      }
+    };
+
+    chartInstances.prog_points = new Chart(
+      document.getElementById('prog_points').getContext('2d'),
+      { type: 'line', data: { labels: dateLabels, datasets }, options: pointProgressOpts }
+    );
+  }
+
   // ---- WORKOUTS PER WEEK bar chart ----
   if (metrics.includes('workout')) {
     const weeks = [...new Set(allDates.map(d => getWeekLabel(d, challenge.startDate)))];
